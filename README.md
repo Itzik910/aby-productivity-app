@@ -1,138 +1,87 @@
-# ABY Productivity App 🚀
+# ABY - Smart Productivity & Task Assistant
 
-An emotionally engaging, innovative, and intuitive full-stack productivity and smart task assistant app for mobile and web. It helps users organize tasks, receive AI-powered suggestions, track performance, and interact with sponsors for motivation and rewards.
+A comprehensive full-stack productivity application with AI-powered suggestions, location-based features, task management, analytics, gamification, and premium features unlocked through profile completion.
 
-## ✨ Features
+## 🌟 Features
 
-### 🧍 User Onboarding & Profile
-- Friendly welcome screen with "Let's Begin" CTA
-- Registration with personal info (name, age, location, profession)
-- User segmentation (student, parent, freelancer, etc.)
-- Evolving user profile and preferences
+### Core Features
+- **Smart Task Management** - Create, organize, and track tasks with AI-powered suggestions
+- **AI Integration** - OpenAI GPT-powered task optimization and productivity insights
+- **Location-Based Features** - Context-aware task suggestions based on your location
+- **Analytics Dashboard** - Comprehensive productivity analytics and progress tracking
+- **Gamification** - Points, streaks, achievements, and challenges to keep you motivated
+- **Real-time Notifications** - Instant updates and reminders
+- **Offline Support** - Work seamlessly even without internet connection
+- **Accessibility** - Designed with accessibility in mind
 
-### ✅ Smart Task Creation + AI-Powered Suggestions
-- AI receives full context (user profile, location, past behavior)
-- Returns 5 personalized suggestions (DIY, location-based, coworking)
-- Step-by-step breakdown upon selection
-- Adaptive personalization based on usage patterns
+### Premium Features (Unlocked via Profile Completion)
+- **Advanced AI** - Unlimited AI-powered task suggestions and insights
+- **Unlimited Tasks** - Create unlimited tasks and projects
+- **Priority Support** - Get faster response times from our support team
+- **Custom Themes** - Personalize your app with custom themes and colors
+- **Data Export** - Export your data in various formats
+- **Advanced Analytics** - Detailed insights into your productivity patterns
+- **Team Features** - Collaborate with team members on shared projects
+- **API Access** - Access to our API for custom integrations
 
-### 📍 Location-Based Task Suggestions & Notifications
-- Live location matching for nearby tasks
-- Contextual notifications for actionable tasks
-- Geofencing and routine-based suggestions
-- Location-aware productivity optimization
-
-### 📆 Annual Task Calendar
-- Interactive year-view with filtering
-- Drag/drop task management
-- Visual status indicators (completed/overdue)
-- Cloud sync across sessions
-
-### 📊 Daily Reflections & Analytics
-- Daily check-ins (mood, productivity, focus)
-- Productivity streaks and completion rates
-- Category breakdowns and time tracking
-- Shareable infographics
-
-### 🏆 Achievements & Social Sharing
-- Milestone badges and rewards
-- Social media integration (FB, IG, X)
-- Shareable banner images
-- Gamification elements
-
-### 🔔 Smart Notifications
-- Task due reminders
-- Streak maintenance alerts
-- Location-triggered opportunities
-- Weekly progress digests
-
-### 🤝 Sponsorship Challenges
-- Brand-sponsored task challenges
-- Custom task flows and visuals
-- Points and rewards system
-- Progress tracking
-
-### 💳 Monetization (Pro Plan)
-- Free tier with core features
-- Pro features: unlimited AI, advanced stats, premium themes
-- Stripe-based billing
-- Early access to sponsored challenges
-
-## 🛠️ Tech Stack
+## 🚀 Tech Stack
 
 ### Frontend
 - **React 18** with TypeScript
-- **React Router** for navigation
-- **React Query** for data fetching
 - **Zustand** for state management
-- **Framer Motion** for animations
+- **React Query** for data fetching
 - **Tailwind CSS** for styling
-- **React Hook Form** for forms
-- **React Hot Toast** for notifications
+- **Framer Motion** for animations
+- **React Router** for navigation
+- **Lucide React** for icons
 
 ### Backend
 - **Node.js** with Express
 - **MongoDB** with Mongoose
 - **JWT** for authentication
 - **OpenAI API** for AI features
-- **Stripe** for payments
 - **Socket.IO** for real-time features
 - **Multer** for file uploads
-- **Nodemailer** for emails
+- **Cloudinary** for image storage
 
-### AI & Analytics
-- **OpenAI GPT-4** integration
-- **Modular prompt system**
-- **Usage tracking and feedback loops**
-- **Personalized suggestions**
-
-### Infrastructure
-- **MongoDB Atlas** for database
-- **Cloudinary** for file storage
-- **Stripe** for payment processing
-- **Nodemailer** for email services
-
-## 🚀 Getting Started
+## 📦 Installation
 
 ### Prerequisites
-- Node.js 18+ 
+- Node.js (v18 or higher)
 - MongoDB (local or Atlas)
 - OpenAI API key
-- Stripe account (for payments)
-- SMTP service (for emails)
 
-### Installation
+### Quick Start
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/aby-productivity-app.git
-   cd aby-productivity-app
+   git clone <your-repo-url>
+   cd ABY
    ```
 
 2. **Install dependencies**
    ```bash
-   npm run install-all
+   # On Windows
+   install.bat
+   
+   # On macOS/Linux
+   ./install.sh
    ```
 
-3. **Environment Setup**
+3. **Configure environment variables**
    
-   Create `.env` files in both `server/` and `client/` directories:
-
    **Server (.env)**
    ```env
    NODE_ENV=development
    PORT=5000
-   MONGODB_URI=mongodb://localhost:27017/aby-productivity
-   JWT_SECRET=your-super-secret-jwt-key
-   JWT_REFRESH_SECRET=your-super-secret-refresh-key
+   MONGODB_URI=your-mongodb-connection-string
+   JWT_SECRET=your-jwt-secret
+   JWT_REFRESH_SECRET=your-refresh-secret
    OPENAI_API_KEY=your-openai-api-key
-   STRIPE_SECRET_KEY=your-stripe-secret-key
-   STRIPE_WEBHOOK_SECRET=your-stripe-webhook-secret
-   SMTP_HOST=your-smtp-host
+   SMTP_HOST=smtp.gmail.com
    SMTP_PORT=587
-   SMTP_USER=your-smtp-user
-   SMTP_PASS=your-smtp-password
-   SMTP_FROM=noreply@abyproductivity.com
+   SMTP_USER=your-email@gmail.com
+   SMTP_PASS=your-app-password
    CLIENT_URL=http://localhost:3000
    CLOUDINARY_CLOUD_NAME=your-cloudinary-name
    CLOUDINARY_API_KEY=your-cloudinary-key
@@ -142,165 +91,148 @@ An emotionally engaging, innovative, and intuitive full-stack productivity and s
    **Client (.env)**
    ```env
    REACT_APP_API_URL=http://localhost:5000/api
-   REACT_APP_STRIPE_PUBLISHABLE_KEY=your-stripe-publishable-key
+   REACT_APP_PREMIUM_ENABLED=true
+   REACT_APP_PREMIUM_UPGRADE_METHOD=profile_completion
+   REACT_APP_GA_TRACKING_ID=your-google-analytics-id
+   REACT_APP_GOOGLE_MAPS_API_KEY=your-google-maps-key
+   REACT_APP_WEATHER_API_KEY=your-weather-api-key
    ```
 
-4. **Start the development servers**
+4. **Start the application**
    ```bash
-   # Start both frontend and backend
    npm start
-   
-   # Or start individually
-   npm run server  # Backend on port 5000
-   npm run client  # Frontend on port 3000
    ```
 
 5. **Access the application**
    - Frontend: http://localhost:3000
-   - Backend API: http://localhost:5000/api
-   - API Health Check: http://localhost:5000/api/health
+   - Backend: http://localhost:5000
+   - API Health: http://localhost:5000/api/health
 
-## 📁 Project Structure
+## 🎯 Premium Upgrade System
 
-```
-aby-productivity-app/
-├── server/                 # Backend Node.js/Express
-│   ├── models/            # MongoDB schemas
-│   ├── routes/            # API routes
-│   ├── middleware/        # Custom middleware
-│   ├── services/          # Business logic
-│   ├── utils/             # Helper functions
-│   └── uploads/           # File uploads
-├── client/                # Frontend React
-│   ├── src/
-│   │   ├── components/    # Reusable components
-│   │   ├── pages/         # Page components
-│   │   ├── hooks/         # Custom hooks
-│   │   ├── stores/        # Zustand stores
-│   │   ├── services/      # API services
-│   │   ├── styles/        # Global styles
-│   │   └── types/         # TypeScript types
-│   └── public/            # Static assets
-├── admin/                 # Admin dashboard (future)
-└── docs/                  # Documentation
-```
+Instead of traditional payment processing, ABY uses a **profile completion system** to unlock premium features:
+
+### Required Profile Fields for Premium
+- Phone number
+- Date of birth
+- Address (city and country)
+- Interests (at least one)
+- Goals (at least one)
+- Work schedule
+- Stress level
+- Sleep pattern
+
+### How It Works
+1. Users complete their basic profile during registration
+2. To unlock premium features, users must provide additional personal details
+3. Once all required fields are completed, users automatically get premium access
+4. Premium status is permanent and includes all advanced features
 
 ## 🔧 Development
 
+### Project Structure
+```
+ABY/
+├── client/                 # React frontend
+│   ├── src/
+│   │   ├── components/     # Reusable components
+│   │   ├── pages/         # Page components
+│   │   ├── stores/        # Zustand stores
+│   │   ├── services/      # API services
+│   │   └── styles/        # Global styles
+│   └── public/            # Static assets
+├── server/                # Node.js backend
+│   ├── routes/            # API routes
+│   ├── models/            # MongoDB models
+│   ├── middleware/        # Express middleware
+│   ├── services/          # Business logic
+│   └── uploads/           # File uploads
+└── docs/                  # Documentation
+```
+
 ### Available Scripts
 
-```bash
-# Root level
-npm start              # Start both frontend and backend
-npm run server         # Start backend only
-npm run client         # Start frontend only
-npm run install-all    # Install all dependencies
-npm run build          # Build for production
-npm run test           # Run tests
+**Root level:**
+- `npm start` - Start both frontend and backend
+- `npm run dev` - Start in development mode
+- `npm run build` - Build for production
+- `npm test` - Run tests
 
-# Backend (server/)
-npm run dev            # Start with nodemon
-npm run test           # Run backend tests
-npm run seed           # Seed database
+**Server:**
+- `npm run dev` - Start with nodemon
+- `npm test` - Run server tests
+- `npm run seed` - Seed database
 
-# Frontend (client/)
-npm start              # Start development server
-npm run build          # Build for production
-npm run test           # Run frontend tests
-npm run lint           # Run ESLint
-```
+**Client:**
+- `npm start` - Start development server
+- `npm run build` - Build for production
+- `npm test` - Run client tests
+- `npm run lint` - Run ESLint
 
-### Code Style
+## 🔐 Environment Variables
 
-- **Backend**: ESLint + Prettier
-- **Frontend**: TypeScript + ESLint + Prettier
-- **Database**: Mongoose schemas with validation
-- **API**: RESTful endpoints with proper error handling
+### Required for Production
+- `MONGODB_URI` - MongoDB connection string
+- `JWT_SECRET` - JWT signing secret
+- `JWT_REFRESH_SECRET` - JWT refresh secret
+- `OPENAI_API_KEY` - OpenAI API key
+- `CLOUDINARY_*` - Cloudinary credentials for file uploads
 
-## 🧪 Testing
-
-```bash
-# Run all tests
-npm run test
-
-# Run backend tests
-cd server && npm test
-
-# Run frontend tests
-cd client && npm test
-
-# Run tests in watch mode
-npm run test:watch
-```
+### Optional
+- `SMTP_*` - Email configuration for notifications
+- `GOOGLE_MAPS_API_KEY` - For location features
+- `WEATHER_API_KEY` - For weather-based suggestions
+- `GA_TRACKING_ID` - Google Analytics
 
 ## 🚀 Deployment
 
 ### Backend Deployment
-1. Set up MongoDB Atlas
-2. Configure environment variables
-3. Deploy to Heroku/Vercel/Railway
-4. Set up domain and SSL
+1. Set up environment variables
+2. Install dependencies: `npm install`
+3. Build: `npm run build`
+4. Start: `npm start`
 
 ### Frontend Deployment
-1. Build the application: `npm run build`
-2. Deploy to Vercel/Netlify
-3. Configure environment variables
-4. Set up custom domain
-
-### Database Setup
-1. Create MongoDB Atlas cluster
-2. Set up database user and network access
-3. Configure connection string
-4. Run initial seed script
-
-## 📊 API Documentation
-
-### Authentication Endpoints
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/login` - User login
-- `POST /api/auth/refresh` - Refresh token
-- `POST /api/auth/logout` - User logout
-
-### Task Endpoints
-- `GET /api/tasks` - Get user tasks
-- `POST /api/tasks` - Create new task
-- `PUT /api/tasks/:id` - Update task
-- `DELETE /api/tasks/:id` - Delete task
-
-### AI Endpoints
-- `POST /api/ai/suggestions/:taskId` - Get AI suggestions
-- `POST /api/ai/feedback/:usageId` - Submit feedback
-
-### Analytics Endpoints
-- `GET /api/analytics/dashboard` - Dashboard analytics
-- `GET /api/analytics/productivity` - Productivity insights
+1. Set up environment variables
+2. Install dependencies: `npm install`
+3. Build: `npm run build`
+4. Deploy the `build` folder
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'Add amazing feature'`
-4. Push to the branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
 
-## 📝 License
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## 🆘 Support
 
-- OpenAI for AI capabilities
-- Stripe for payment processing
-- MongoDB for database
-- React and Node.js communities
-- All contributors and supporters
+For support and questions:
+- Create an issue in the repository
+- Check the documentation in the `docs/` folder
+- Contact the development team
 
-## 📞 Support
+## 🔄 Updates
 
-- **Email**: support@abyproductivity.com
-- **Documentation**: [docs.abyproductivity.com](https://docs.abyproductivity.com)
-- **Issues**: [GitHub Issues](https://github.com/yourusername/aby-productivity-app/issues)
+### Recent Changes
+- **Removed Stripe payment processing**
+- **Implemented profile-based premium system**
+- **Added comprehensive premium upgrade interface**
+- **Updated user model with premium details**
+- **Enhanced security and validation**
+
+### Upcoming Features
+- Team collaboration features
+- Advanced AI integrations
+- Mobile app development
+- API documentation
+- Performance optimizations
 
 ---
 
-Made with ❤️ by the ABY Team 
+**ABY** - Transform your productivity with AI-powered insights and smart task management! 🚀 

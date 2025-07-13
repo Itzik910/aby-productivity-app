@@ -1,27 +1,27 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const User = require('../models/User');
-const { 
-  authenticateToken, 
-  generateToken, 
-  generateRefreshToken, 
-  verifyRefreshToken 
-} = require('../middleware/auth');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const { generateToken, generateRefreshToken } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Email transporter setup
-const transporter = nodemailer.createTransporter({
-  host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  secure: true,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
-  }
-});
+// Email transporter setup (conditional)
+let transporter = null;
+if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+  transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: process.env.SMTP_PORT || 587,
+    secure: process.env.SMTP_PORT === '465', // true for 465, false for other ports
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS
+    }
+  });
+}
 
 // Validation rules
 const registerValidation = [
@@ -101,9 +101,11 @@ router.post('/register', registerValidation, async (req, res) => {
 
     await user.save();
 
-    // Send verification email
-    const verificationUrl = `${process.env.CLIENT_URL}/verify-email?token=${verificationToken}`;
-    await sendVerificationEmail(user.email, user.name, verificationUrl);
+    // Send verification email (if email is configured)
+    if (transporter) {
+      const verificationUrl = `${process.env.CLIENT_URL}/verify-email?token=${verificationToken}`;
+      await sendVerificationEmail(user.email, user.name, verificationUrl);
+    }
 
     // Generate tokens
     const token = generateToken(user._id);
@@ -111,7 +113,7 @@ router.post('/register', registerValidation, async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'User registered successfully. Please check your email to verify your account.',
+      message: transporter ? 'User registered successfully. Please check your email to verify your account.' : 'User registered successfully.',
       data: {
         user: {
           _id: user._id,
@@ -119,7 +121,7 @@ router.post('/register', registerValidation, async (req, res) => {
           email: user.email,
           profession: user.profession,
           isVerified: user.isVerified,
-          subscription: user.subscription
+          premium: user.premium
         },
         token,
         refreshToken
@@ -128,9 +130,29 @@ router.post('/register', registerValidation, async (req, res) => {
 
   } catch (error) {
     console.error('Registration error:', error);
+    
+    // Handle specific MongoDB errors
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'User with this email already exists'
+      });
+    }
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: validationErrors
+      });
+    }
+    
     res.status(500).json({
       success: false,
-      message: 'Registration failed'
+      message: 'Registration failed',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 });
@@ -197,7 +219,7 @@ router.post('/login', loginValidation, async (req, res) => {
           avatar: user.avatar,
           profession: user.profession,
           isVerified: user.isVerified,
-          subscription: user.subscription,
+          premium: user.premium,
           stats: user.stats,
           preferences: user.preferences
         },
@@ -230,7 +252,7 @@ router.post('/refresh', async (req, res) => {
     }
 
     // Verify refresh token
-    const decoded = verifyRefreshToken(refreshToken);
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
     
     // Check if user exists and is active
     const user = await User.findById(decoded.userId);
@@ -415,7 +437,7 @@ router.post('/reset-password', [
 // @route   POST /api/auth/logout
 // @desc    Logout user
 // @access  Private
-router.post('/logout', authenticateToken, async (req, res) => {
+router.post('/logout', async (req, res) => {
   try {
     // In a more complex setup, you might want to blacklist the token
     // For now, we'll just return a success response
@@ -436,7 +458,7 @@ router.post('/logout', authenticateToken, async (req, res) => {
 // @route   GET /api/auth/me
 // @desc    Get current user
 // @access  Private
-router.get('/me', authenticateToken, async (req, res) => {
+router.get('/me', async (req, res) => {
   try {
     const user = await User.findById(req.user._id)
       .select('-password')
@@ -459,7 +481,7 @@ router.get('/me', authenticateToken, async (req, res) => {
 // @route   POST /api/auth/resend-verification
 // @desc    Resend verification email
 // @access  Private
-router.post('/resend-verification', authenticateToken, async (req, res) => {
+router.post('/resend-verification', async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
 

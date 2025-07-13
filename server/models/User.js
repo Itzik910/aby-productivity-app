@@ -57,6 +57,68 @@ const userSchema = new mongoose.Schema({
     default: 'UTC'
   },
   
+  // Premium Profile Information (required for premium upgrade)
+  premiumDetails: {
+    phoneNumber: {
+      type: String,
+      validate: {
+        validator: function(v) {
+          return /^\+?[\d\s\-\(\)]+$/.test(v);
+        },
+        message: 'Please enter a valid phone number'
+      }
+    },
+    dateOfBirth: {
+      type: Date,
+      validate: {
+        validator: function(v) {
+          if (!v) return true;
+          const age = Math.floor((Date.now() - v.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+          return age >= 13 && age <= 120;
+        },
+        message: 'Age must be between 13 and 120 years'
+      }
+    },
+    address: {
+      street: String,
+      city: String,
+      state: String,
+      zipCode: String,
+      country: String
+    },
+    emergencyContact: {
+      name: String,
+      relationship: String,
+      phone: String
+    },
+    interests: [{
+      type: String,
+      enum: ['productivity', 'health', 'education', 'business', 'technology', 'creativity', 'fitness', 'travel', 'cooking', 'reading', 'music', 'sports', 'art', 'science', 'finance', 'other']
+    }],
+    goals: [{
+      type: String,
+      enum: ['career_advancement', 'skill_development', 'health_improvement', 'financial_stability', 'personal_growth', 'relationship_building', 'work_life_balance', 'learning_new_language', 'starting_business', 'fitness_goals', 'other']
+    }],
+    workSchedule: {
+      type: String,
+      enum: ['9to5', 'flexible', 'shift_work', 'remote', 'part_time', 'freelance', 'student', 'unemployed', 'other']
+    },
+    stressLevel: {
+      type: String,
+      enum: ['low', 'moderate', 'high', 'very_high']
+    },
+    sleepPattern: {
+      type: String,
+      enum: ['early_bird', 'night_owl', 'regular', 'irregular']
+    },
+    dietaryRestrictions: [String],
+    accessibilityNeeds: [String],
+    preferredCommunication: {
+      type: String,
+      enum: ['email', 'sms', 'push_notifications', 'in_app', 'phone']
+    }
+  },
+  
   // Preferences
   preferences: {
     theme: {
@@ -85,18 +147,21 @@ const userSchema = new mongoose.Schema({
     }
   },
   
-  // Subscription & Billing
-  subscription: {
-    plan: {
+  // Premium Status (replaces Stripe subscription)
+  premium: {
+    isPremium: { type: Boolean, default: false },
+    upgradeDate: Date,
+    upgradeMethod: {
       type: String,
-      enum: ['free', 'pro', 'enterprise'],
-      default: 'free'
+      enum: ['profile_completion', 'admin_granted', 'promotional'],
+      default: 'profile_completion'
     },
-    stripeCustomerId: String,
-    stripeSubscriptionId: String,
-    currentPeriodStart: Date,
-    currentPeriodEnd: Date,
-    cancelAtPeriodEnd: { type: Boolean, default: false }
+    premiumFeatures: [{
+      type: String,
+      enum: ['advanced_ai', 'unlimited_tasks', 'priority_support', 'custom_themes', 'data_export', 'team_features', 'advanced_analytics', 'api_access']
+    }],
+    premiumUntil: Date, // For temporary premium access
+    isLifetime: { type: Boolean, default: false }
   },
   
   // Statistics & Progress
@@ -132,37 +197,88 @@ const userSchema = new mongoose.Schema({
   // Account Status
   isActive: { type: Boolean, default: true },
   isVerified: { type: Boolean, default: false },
+  isAdmin: { type: Boolean, default: false },
   verificationToken: String,
   resetPasswordToken: String,
   resetPasswordExpires: Date,
-  lastLogin: Date,
   
-  // Social Features
-  following: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
-  followers: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
+  // Deactivation tracking
+  deactivatedAt: Date,
+  deactivationReason: {
+    type: String,
+    enum: ['user_request', 'inactivity', 'violation', 'admin_action']
+  },
+  
+  // Push Notifications
+  pushSubscription: {
+    endpoint: String,
+    keys: {
+      p256dh: String,
+      auth: String
+    }
+  },
+  
+  // Security & Activity
+  lastLoginAt: { type: Date, default: Date.now },
+  loginAttempts: { type: Number, default: 0 },
+  lockUntil: Date,
+  twoFactorSecret: String,
+  twoFactorEnabled: { type: Boolean, default: false },
   
   // Device Management
   devices: [{
     deviceId: String,
-    deviceName: String,
-    lastActive: Date,
+    deviceType: String, // 'mobile', 'desktop', 'tablet'
+    userAgent: String,
+    lastUsed: { type: Date, default: Date.now },
     isActive: { type: Boolean, default: true }
+  }],
+  
+  // API Access
+  apiKey: String,
+  apiKeyCreatedAt: Date,
+  apiUsage: {
+    requests: { type: Number, default: 0 },
+    lastRequest: Date
+  },
+  
+  // Social Features
+  following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  
+  // Collaboration
+  teams: [{
+    teamId: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
+    role: { type: String, enum: ['member', 'admin', 'owner'], default: 'member' },
+    joinedAt: { type: Date, default: Date.now }
+  }],
+  
+  // File uploads
+  uploadedFiles: [{
+    filename: String,
+    originalName: String,
+    url: String,
+    size: Number,
+    mimetype: String,
+    uploadedAt: { type: Date, default: Date.now }
   }]
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
 });
 
 // Indexes for performance
 userSchema.index({ email: 1 });
-userSchema.index({ 'location.coordinates': '2dsphere' });
-userSchema.index({ 'stats.totalPoints': -1 });
-userSchema.index({ createdAt: -1 });
+userSchema.index({ 'premium.isPremium': 1 });
+userSchema.index({ isActive: 1 });
+userSchema.index({ lastLoginAt: 1 });
+userSchema.index({ 'pushSubscription.endpoint': 1 });
+
+// Virtual for account lock status
+userSchema.virtual('isLocked').get(function() {
+  return !!(this.lockUntil && this.lockUntil > Date.now());
+});
 
 // Pre-save middleware to hash password
 userSchema.pre('save', async function(next) {
@@ -191,24 +307,70 @@ userSchema.methods.getPublicProfile = function() {
     profession: this.profession,
     stats: this.stats,
     achievements: this.achievements,
-    isActive: this.isActive
+    isActive: this.isActive,
+    premium: {
+      isPremium: this.premium.isPremium,
+      premiumFeatures: this.premium.premiumFeatures
+    }
   };
 };
 
-// Static method to find users by location
-userSchema.statics.findNearby = function(coordinates, maxDistance = 10000) {
-  return this.find({
-    'location.coordinates': {
-      $near: {
-        $geometry: {
-          type: 'Point',
-          coordinates: coordinates
-        },
-        $maxDistance: maxDistance
-      }
-    },
-    'preferences.privacy.shareLocation': true,
-    isActive: true
+// Instance method to check if user can upgrade to premium
+userSchema.methods.canUpgradeToPremium = function() {
+  const requiredFields = (process.env.PREMIUM_REQUIRED_FIELDS || 'phoneNumber,dateOfBirth,address,interests,goals,workSchedule,stressLevel,sleepPattern').split(',');
+  
+  return requiredFields.every(field => {
+    const fieldPath = `premiumDetails.${field}`;
+    const value = fieldPath.split('.').reduce((obj, key) => obj && obj[key], this);
+    return value && (Array.isArray(value) ? value.length > 0 : true);
+  });
+};
+
+// Instance method to upgrade to premium
+userSchema.methods.upgradeToPremium = function() {
+  if (!this.canUpgradeToPremium()) {
+    throw new Error('Cannot upgrade to premium: missing required profile details');
+  }
+  
+  this.premium.isPremium = true;
+  this.premium.upgradeDate = new Date();
+  this.premium.upgradeMethod = process.env.PREMIUM_UPGRADE_METHOD || 'profile_completion';
+  this.premium.premiumFeatures = [
+    'advanced_ai',
+    'unlimited_tasks', 
+    'priority_support',
+    'custom_themes',
+    'data_export',
+    'advanced_analytics'
+  ];
+  
+  return this.save();
+};
+
+// Instance method to handle failed login attempts
+userSchema.methods.incLoginAttempts = function() {
+  // If we have a previous lock that has expired, restart at 1
+  if (this.lockUntil && this.lockUntil < Date.now()) {
+    return this.updateOne({
+      $unset: { lockUntil: 1 },
+      $set: { loginAttempts: 1 }
+    });
+  }
+  
+  const updates = { $inc: { loginAttempts: 1 } };
+  
+  // Lock account after 5 failed attempts for 2 hours
+  if (this.loginAttempts + 1 >= 5 && !this.isLocked) {
+    updates.$set = { lockUntil: Date.now() + 2 * 60 * 60 * 1000 }; // 2 hours
+  }
+  
+  return this.updateOne(updates);
+};
+
+// Instance method to reset login attempts
+userSchema.methods.resetLoginAttempts = function() {
+  return this.updateOne({
+    $unset: { loginAttempts: 1, lockUntil: 1 }
   });
 };
 

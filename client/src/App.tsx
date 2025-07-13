@@ -1,52 +1,63 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from 'react-query';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { HelmetProvider } from 'react-helmet-async';
-
-// Components
-import Layout from './components/Layout/Layout';
-import ProtectedRoute from './components/Auth/ProtectedRoute';
-import LoadingSpinner from './components/UI/LoadingSpinner';
 
 // Pages
 import WelcomePage from './pages/WelcomePage';
-import LoginPage from './pages/Auth/LoginPage';
-import RegisterPage from './pages/Auth/RegisterPage';
-import ForgotPasswordPage from './pages/Auth/ForgotPasswordPage';
-import ResetPasswordPage from './pages/Auth/ResetPasswordPage';
-import VerifyEmailPage from './pages/Auth/VerifyEmailPage';
-import DashboardPage from './pages/Dashboard/DashboardPage';
-import TasksPage from './pages/Tasks/TasksPage';
-import TaskDetailPage from './pages/Tasks/TaskDetailPage';
-import CalendarPage from './pages/Calendar/CalendarPage';
-import AnalyticsPage from './pages/Analytics/AnalyticsPage';
-import AchievementsPage from './pages/Achievements/AchievementsPage';
-import ChallengesPage from './pages/Challenges/ChallengesPage';
-import ProfilePage from './pages/Profile/ProfilePage';
-import SettingsPage from './pages/Settings/SettingsPage';
-import NotFoundPage from './pages/NotFoundPage';
+import PremiumUpgradePage from './pages/PremiumUpgradePage';
+import TasksPage from './pages/TasksPage';
+import DashboardPage from './pages/DashboardPage';
+import ChallengesPage from './pages/ChallengesPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import CalendarPage from './pages/CalendarPage';
+import AnalyticsPage from './pages/AnalyticsPage';
+import AchievementsPage from './pages/AchievementsPage';
 
-// Hooks
+// Stores
 import { useAuthStore } from './stores/authStore';
 import { useThemeStore } from './stores/themeStore';
 
-// Styles
-import './styles/globals.css';
+// Simple loading component
+const LoadingSpinner = ({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) => {
+  const sizeClasses = {
+    sm: 'h-4 w-4',
+    md: 'h-8 w-8',
+    lg: 'h-12 w-12'
+  };
+  
+  return (
+    <div className={`animate-spin rounded-full border-b-2 border-purple-600 ${sizeClasses[size]}`}></div>
+  );
+};
 
-// Create a client
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-      staleTime: 5 * 60 * 1000, // 5 minutes
-    },
-  },
-});
+// Simple protected route component
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated } = useAuthStore();
+  
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">🔐 Login Required</h1>
+          <p className="text-xl text-gray-600 mb-8">Please log in to access this feature</p>
+          <a 
+            href="/" 
+            className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            Go to Welcome Page
+          </a>
+        </div>
+      </div>
+    );
+  }
+  
+  return <>{children}</>;
+};
 
 function App() {
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const { isLoading } = useAuthStore();
   const { theme } = useThemeStore();
 
   // Apply theme to document
@@ -56,160 +67,72 @@ function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-background-dark dark:to-surface-dark">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50">
         <LoadingSpinner size="lg" />
       </div>
     );
   }
 
   return (
-    <HelmetProvider>
-      <QueryClientProvider client={queryClient}>
-        <Router>
-          <div className="App">
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/" element={<WelcomePage />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/reset-password" element={<ResetPasswordPage />} />
-              <Route path="/verify-email" element={<VerifyEmailPage />} />
+    <Router>
+      <div className="App">
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={<WelcomePage />} />
+          
+          {/* Main App Routes */}
+          <Route path="/tasks" element={<TasksPage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/challenges" element={<ChallengesPage />} />
+          <Route path="/premium" element={<PremiumUpgradePage />} />
+          
+          {/* Auth Routes */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          
+          {/* Other routes */}
+          <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/achievements" element={<AchievementsPage />} />
+          
+          {/* Catch all route */}
+          <Route path="*" element={
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50">
+              <div className="text-center">
+                <h1 className="text-4xl font-bold text-gray-900 mb-4">🚀 ABY Productivity</h1>
+                <p className="text-xl text-gray-600 mb-8">Page not found</p>
+                <a 
+                  href="/" 
+                  className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  Go Home
+                </a>
+              </div>
+            </div>
+          } />
+        </Routes>
 
-              {/* Protected Routes */}
-              <Route
-                path="/dashboard"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <DashboardPage />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/tasks"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <TasksPage />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/tasks/:taskId"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <TaskDetailPage />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/calendar"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <CalendarPage />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/analytics"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <AnalyticsPage />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/achievements"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <AchievementsPage />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/challenges"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <ChallengesPage />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/profile"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <ProfilePage />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/settings"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <SettingsPage />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-
-              {/* Redirect authenticated users away from auth pages */}
-              <Route
-                path="/login"
-                element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />}
-              />
-              <Route
-                path="/register"
-                element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <RegisterPage />}
-              />
-
-              {/* 404 Page */}
-              <Route path="*" element={<NotFoundPage />} />
-            </Routes>
-
-            {/* Global Toaster */}
-            <Toaster
-              position="top-right"
-              toastOptions={{
-                duration: 4000,
-                style: {
-                  background: theme === 'dark' ? '#1a1a2e' : '#ffffff',
-                  color: theme === 'dark' ? '#ffffff' : '#1f2937',
-                  border: `1px solid ${theme === 'dark' ? '#374151' : '#e5e7eb'}`,
-                },
-                success: {
-                  iconTheme: {
-                    primary: '#22c55e',
-                    secondary: '#ffffff',
-                  },
-                },
-                error: {
-                  iconTheme: {
-                    primary: '#ef4444',
-                    secondary: '#ffffff',
-                  },
-                },
-              }}
-            />
-          </div>
-        </Router>
-      </QueryClientProvider>
-    </HelmetProvider>
+        {/* Global Toaster */}
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 4000,
+            style: {
+              background: theme === 'dark' ? '#1a1a2e' : '#ffffff',
+              color: theme === 'dark' ? '#ffffff' : '#1f2937',
+              border: `1px solid ${theme === 'dark' ? '#374151' : '#e5e7eb'}`,
+            },
+            success: {
+              iconTheme: {
+                primary: '#22c55e',
+                secondary: '#ffffff',
+              },
+            },
+          }}
+        />
+      </div>
+    </Router>
   );
 }
 

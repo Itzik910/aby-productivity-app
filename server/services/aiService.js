@@ -3,515 +3,322 @@ const AIUsage = require('../models/AIUsage');
 const User = require('../models/User');
 const Task = require('../models/Task');
 
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
 class AIService {
   constructor() {
-    this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-    
-    this.prompts = {
-      taskSuggestion: this.getTaskSuggestionPrompt(),
-      completionHelp: this.getCompletionHelpPrompt(),
-      optimization: this.getOptimizationPrompt(),
-      locationBased: this.getLocationBasedPrompt(),
-      moodAnalysis: this.getMoodAnalysisPrompt(),
-      productivityInsight: this.getProductivityInsightPrompt()
-    };
+    this.defaultModel = 'gpt-3.5-turbo';
+    this.maxTokens = 1000;
   }
 
-  // Task Suggestion Prompt
-  getTaskSuggestionPrompt() {
-    return `You are an intelligent productivity assistant helping users complete their tasks more effectively. 
-
-Given a task and user context, provide 5 personalized suggestions to help complete the task. Each suggestion should be:
-1. Specific and actionable
-2. Tailored to the user's context (location, time, mood, profession)
-3. Different in approach (DIY, location-based, collaboration, optimization, timing)
-
-User Context:
-- Profession: {profession}
-- Location: {location}
-- Time of day: {timeOfDay}
-- Current mood: {mood}
-- Energy level: {energy}
-- Recent completed tasks: {recentTasks}
-
-Task: {taskTitle}
-Description: {taskDescription}
-
-Provide suggestions in this JSON format:
-{
-  "suggestions": [
-    {
-      "text": "suggestion text",
-      "type": "completion|optimization|location|timing|collaboration",
-      "confidence": 0.85,
-      "reasoning": "why this suggestion is relevant"
-    }
-  ],
-  "stepByStepBreakdown": [
-    {
-      "step": "step description",
-      "estimatedTime": 15,
-      "difficulty": "easy|medium|hard"
-    }
-  ],
-  "motivationalMessage": "encouraging message",
-  "relatedTasks": ["related task 1", "related task 2"]
-}`;
-  }
-
-  // Completion Help Prompt
-  getCompletionHelpPrompt() {
-    return `You are helping a user complete a task that they're struggling with. 
-
-User Context:
-- Task: {taskTitle}
-- Current progress: {progress}%
-- Time spent: {timeSpent} minutes
-- Current mood: {mood}
-- Energy level: {energy}
-
-Provide specific, actionable advice to help them complete this task. Focus on:
-1. Breaking down remaining work into smaller steps
-2. Motivation and encouragement
-3. Practical tips based on their current state
-4. Alternative approaches if they're stuck
-
-Format your response as JSON with:
-{
-  "suggestions": [
-    {
-      "text": "specific advice",
-      "type": "completion",
-      "confidence": 0.9,
-      "reasoning": "why this will help"
-    }
-  ],
-  "stepByStepBreakdown": [
-    {
-      "step": "next action to take",
-      "estimatedTime": 10,
-      "difficulty": "easy"
-    }
-  ],
-  "motivationalMessage": "encouraging message",
-  "blockerAnalysis": "what might be blocking progress"
-}`;
-  }
-
-  // Optimization Prompt
-  getOptimizationPrompt() {
-    return `You are a productivity optimization expert. Analyze the user's task and suggest ways to make it more efficient.
-
-User Context:
-- Task: {taskTitle}
-- Estimated duration: {estimatedDuration} minutes
-- Category: {category}
-- Priority: {priority}
-- User's profession: {profession}
-
-Suggest optimizations that:
-1. Reduce time and effort
-2. Improve quality of outcome
-3. Leverage user's strengths and context
-4. Consider available tools and resources
-
-Provide JSON response with:
-{
-  "suggestions": [
-    {
-      "text": "optimization suggestion",
-      "type": "optimization",
-      "confidence": 0.8,
-      "reasoning": "why this optimization works"
-    }
-  ],
-  "timeSavings": "estimated time saved",
-  "qualityImprovement": "how this improves quality",
-  "toolsNeeded": ["tool1", "tool2"]
-}`;
-  }
-
-  // Location-Based Prompt
-  getLocationBasedPrompt() {
-    return `You are a location-aware productivity assistant. The user is at {location} and has a task to complete.
-
-Location Context:
-- City: {city}
-- Country: {country}
-- Time: {timeOfDay}
-- Weather: {weather}
-
-Task: {taskTitle}
-
-Suggest location-specific approaches that:
-1. Use nearby resources and services
-2. Consider local context and timing
-3. Optimize for the user's current location
-4. Suggest nearby places that could help
-
-Provide JSON response with:
-{
-  "suggestions": [
-    {
-      "text": "location-specific suggestion",
-      "type": "location",
-      "confidence": 0.85,
-      "reasoning": "why this location approach works"
-    }
-  ],
-  "nearbyPlaces": [
-    {
-      "name": "place name",
-      "type": "store|service|facility",
-      "distance": "0.5km",
-      "relevance": "why this place helps"
-    }
-  ],
-  "localTips": ["tip1", "tip2"],
-  "timingAdvice": "best time to do this locally"
-}`;
-  }
-
-  // Mood Analysis Prompt
-  getMoodAnalysisPrompt() {
-    return `You are analyzing the user's mood and energy to suggest the best approach for their task.
-
-Current State:
-- Mood: {mood}
-- Energy: {energy}
-- Time of day: {timeOfDay}
-- Recent activity: {recentActivity}
-
-Task: {taskTitle}
-Priority: {priority}
-
-Based on their current state, suggest:
-1. Whether to proceed with the task now or later
-2. How to approach the task given their mood
-3. Energy-appropriate task modifications
-4. Mood-boosting activities if needed
-
-Provide JSON response with:
-{
-  "suggestions": [
-    {
-      "text": "mood-appropriate suggestion",
-      "type": "timing",
-      "confidence": 0.9,
-      "reasoning": "why this fits their current state"
-    }
-  ],
-  "recommendedTiming": "now|later|tomorrow",
-  "energyLevel": "low|medium|high",
-  "moodBoosters": ["activity1", "activity2"],
-  "taskModifications": "how to adjust the task"
-}`;
-  }
-
-  // Productivity Insight Prompt
-  getProductivityInsightPrompt() {
-    return `You are analyzing the user's productivity patterns to provide personalized insights.
-
-User Stats:
-- Total tasks completed: {totalTasks}
-- Current streak: {currentStreak}
-- Average completion time: {avgCompletionTime}
-- Preferred categories: {preferredCategories}
-- Most productive time: {mostProductiveTime}
-
-Recent Performance:
-- Tasks completed today: {todayCompleted}
-- Tasks overdue: {overdueTasks}
-- Focus score: {focusScore}
-
-Provide insights that:
-1. Celebrate achievements
-2. Identify patterns and trends
-3. Suggest improvements
-4. Motivate continued progress
-
-Provide JSON response with:
-{
-  "insights": [
-    {
-      "text": "insight about their productivity",
-      "type": "achievement|pattern|improvement",
-      "confidence": 0.8
-    }
-  ],
-  "achievements": ["achievement1", "achievement2"],
-  "recommendations": ["recommendation1", "recommendation2"],
-  "motivationalMessage": "encouraging message"
-}`;
-  }
-
-  // Main method to generate AI suggestions
-  async generateSuggestions(userId, taskId, requestType, additionalContext = {}) {
-    const startTime = Date.now();
-    
+  async generateTaskSuggestions(task, user) {
     try {
-      // Get user and task data
-      const user = await User.findById(userId);
-      const task = await Task.findById(taskId);
+      const context = this.buildUserContext(user);
+      const taskContext = this.buildTaskContext(task);
       
-      if (!user || !task) {
-        throw new Error('User or task not found');
-      }
+      const prompt = `
+You are ABY, an intelligent productivity assistant. Generate 5 personalized task completion suggestions for the user.
 
-      // Prepare context
-      const context = await this.buildContext(user, task, additionalContext);
-      
-      // Get appropriate prompt
-      const prompt = this.prompts[requestType];
-      if (!prompt) {
-        throw new Error(`Unknown request type: ${requestType}`);
-      }
+User Context:
+${context}
 
-      // Fill prompt template
-      const filledPrompt = this.fillPromptTemplate(prompt, context);
+Task Details:
+${taskContext}
 
-      // Call OpenAI
-      const completion = await this.openai.chat.completions.create({
-        model: "gpt-4",
-        messages: [
-          {
-            role: "system",
-            content: "You are a helpful productivity assistant. Always respond with valid JSON."
-          },
-          {
-            role: "user",
-            content: filledPrompt
-          }
-        ],
+Generate 5 diverse suggestions that are:
+1. Actionable and specific
+2. Tailored to the user's profile and location
+3. Consider the task's priority and deadline
+4. Include different approaches (DIY, collaborative, location-based, time-based, resource-based)
+5. Are emotionally engaging and motivating
+
+Format each suggestion as a clear, concise action item (max 100 characters each).
+Return as a JSON array of strings.
+
+Example format:
+["Break task into 3 smaller 25-minute focused sessions", "Find a coworking space nearby to boost productivity", "Schedule task for your most productive time (morning)", "Ask a colleague to be your accountability partner", "Use the Pomodoro technique with 5-minute breaks"]
+`;
+
+      const response = await openai.chat.completions.create({
+        model: this.defaultModel,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: this.maxTokens,
         temperature: 0.7,
-        max_tokens: 1000,
       });
 
-      const response = completion.choices[0].message.content;
-      const parsedResponse = JSON.parse(response);
-
-      // Calculate tokens and cost
-      const tokens = {
-        input: completion.usage.prompt_tokens,
-        output: completion.usage.completion_tokens,
-        total: completion.usage.total_tokens
-      };
-
-      const cost = this.calculateCost(tokens);
-
-      // Log AI usage
-      const aiUsage = new AIUsage({
-        user: userId,
-        requestType,
-        input: {
-          taskTitle: task.title,
-          taskDescription: task.description,
-          userContext: context.userContext,
-          userPreferences: context.userPreferences
-        },
-        response: parsedResponse,
-        tokens,
-        cost,
-        performance: {
-          responseTime: Date.now() - startTime
-        },
-        context: {
-          userLevel: user.stats.level,
-          userStreak: user.stats.currentStreak,
-          totalTasksCompleted: user.stats.completedTasks,
-          averageTaskCompletionTime: context.avgCompletionTime,
-          preferredCategories: context.preferredCategories,
-          activeChallenges: context.activeChallenges
-        }
-      });
-
-      await aiUsage.save();
-
-      // Update user AI usage stats
-      await this.updateUserAIStats(userId, tokens, cost);
-
-      return {
-        success: true,
-        data: parsedResponse,
-        usage: {
-          tokens,
-          cost,
-          responseTime: Date.now() - startTime
-        }
-      };
-
+      const suggestions = JSON.parse(response.choices[0].message.content);
+      return suggestions;
     } catch (error) {
-      console.error('AI Service Error:', error);
-      
-      // Log failed request
-      const aiUsage = new AIUsage({
-        user: userId,
-        requestType,
-        performance: {
-          responseTime: Date.now() - startTime,
-          errorOccurred: true,
-          errorMessage: error.message
-        }
-      });
-      await aiUsage.save();
+      console.error('Error generating task suggestions:', error);
+      // Fallback suggestions
+      return [
+        'Break this task into smaller, manageable steps',
+        'Set a specific time block to focus on this task',
+        'Find a quiet environment to work on this',
+        'Use the Pomodoro technique for better focus',
+        'Consider collaborating with someone for accountability'
+      ];
+    }
+  }
 
+  async generateLocationBasedSuggestions(task, userLocation) {
+    try {
+      const prompt = `
+Given this task: "${task.title}" - ${task.description}
+User location: ${userLocation.city}, ${userLocation.country}
+Task category: ${task.category}
+Priority: ${task.priority}
+
+Generate 3 location-based suggestions that consider:
+1. Nearby venues or services that could help
+2. Location-specific opportunities
+3. Local resources or communities
+
+Return as a JSON array of strings.
+`;
+
+      const response = await openai.chat.completions.create({
+        model: this.defaultModel,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 500,
+        temperature: 0.6,
+      });
+
+      return JSON.parse(response.choices[0].message.content);
+    } catch (error) {
+      console.error('Error generating location suggestions:', error);
+      return ['Complete this task at a nearby library or café', 'Look for local meetups related to this task', 'Check if there are local services that could help'];
+    }
+  }
+
+  async generateDailyReflectionPrompts(user) {
+    try {
+      const prompt = `
+Generate 3 thoughtful daily reflection prompts for a productivity app user.
+User profile: ${user.profession || 'Professional'}, Age: ${user.age || 'Adult'}
+
+The prompts should:
+1. Be engaging and not feel like work
+2. Help users reflect on their productivity and well-being
+3. Be answerable in 1-2 sentences
+4. Encourage positive thinking and growth mindset
+
+Return as a JSON array of strings.
+`;
+
+      const response = await openai.chat.completions.create({
+        model: this.defaultModel,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 400,
+        temperature: 0.8,
+      });
+
+      return JSON.parse(response.choices[0].message.content);
+    } catch (error) {
+      console.error('Error generating reflection prompts:', error);
+      return [
+        'What was the highlight of your productive day today?',
+        'What challenge did you overcome, and how did it make you feel?',
+        'What are you most looking forward to accomplishing tomorrow?'
+      ];
+    }
+  }
+
+  async generateMotivationalMessage(user, context = {}) {
+    try {
+      const prompt = `
+Generate a personalized motivational message for a user of a productivity app.
+User: ${user.name || 'User'}
+Context: ${context.type || 'general'} - ${context.details || ''}
+Tone: Encouraging, friendly, and energizing
+Length: 1-2 sentences maximum
+
+Make it personal and actionable.
+`;
+
+      const response = await openai.chat.completions.create({
+        model: this.defaultModel,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 100,
+        temperature: 0.8,
+      });
+
+      return response.choices[0].message.content.trim();
+    } catch (error) {
+      console.error('Error generating motivational message:', error);
+      return "You're doing great! Every small step forward is progress worth celebrating. Keep going! 🌟";
+    }
+  }
+
+  async generateTaskBreakdown(task) {
+    try {
+      const prompt = `
+Break down this task into 3-5 actionable steps:
+Task: "${task.title}"
+Description: ${task.description || 'No description provided'}
+Category: ${task.category}
+Priority: ${task.priority}
+Estimated Duration: ${task.estimatedDuration || 'Not specified'} minutes
+
+Generate clear, sequential steps that:
+1. Are specific and actionable
+2. Follow a logical order
+3. Are appropriately sized (15-45 minutes each)
+4. Include any necessary preparation or follow-up
+
+Return as a JSON array of objects with 'title' and 'description' fields.
+`;
+
+      const response = await openai.chat.completions.create({
+        model: this.defaultModel,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 600,
+        temperature: 0.6,
+      });
+
+      return JSON.parse(response.choices[0].message.content);
+    } catch (error) {
+      console.error('Error generating task breakdown:', error);
+      return [
+        { title: 'Plan and prepare', description: 'Gather necessary resources and plan your approach' },
+        { title: 'Begin execution', description: 'Start working on the main task components' },
+        { title: 'Review and finalize', description: 'Check your work and make final adjustments' }
+      ];
+    }
+  }
+
+  async generateWeeklySummary(user, tasks, analytics) {
+    try {
+      const prompt = `
+Generate a personalized weekly productivity summary for:
+User: ${user.name}
+Tasks completed: ${analytics.completedTasks}/${analytics.totalTasks}
+Most productive day: ${analytics.bestDay || 'N/A'}
+Top category: ${analytics.topCategory || 'N/A'}
+Completion rate: ${analytics.completionRate}%
+
+Create an encouraging summary that:
+1. Celebrates achievements
+2. Identifies patterns and insights
+3. Provides gentle suggestions for improvement
+4. Maintains a positive, motivating tone
+5. Is 2-3 sentences long
+
+Include relevant emojis to make it engaging.
+`;
+
+      const response = await openai.chat.completions.create({
+        model: this.defaultModel,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 200,
+        temperature: 0.7,
+      });
+
+      return response.choices[0].message.content.trim();
+    } catch (error) {
+      console.error('Error generating weekly summary:', error);
+      return `Great week! 🎉 You completed ${analytics.completedTasks} tasks and showed real dedication to your goals. Keep up the momentum! 💪`;
+    }
+  }
+
+  buildUserContext(user) {
+    return `
+Name: ${user.name || 'User'}
+Age: ${user.age || 'Not specified'}
+Location: ${user.location?.city || 'Not specified'}, ${user.location?.country || ''}
+Profession: ${user.profession || 'Not specified'}
+Premium: ${user.premium?.isPremium ? 'Yes' : 'No'}
+Productivity Level: ${user.stats?.completionRate || 0}%
+Preferred Work Time: ${user.preferences?.workingHours || 'Not specified'}
+Current Goals: ${user.goals?.join(', ') || 'Not specified'}
+`;
+  }
+
+  buildTaskContext(task) {
+    return `
+Title: ${task.title}
+Description: ${task.description || 'No description'}
+Category: ${task.category}
+Priority: ${task.priority}
+Due Date: ${task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'Not set'}
+Estimated Duration: ${task.estimatedDuration || 'Not specified'} minutes
+Location: ${task.location?.name || 'Not specified'}
+Current Status: ${task.status}
+Tags: ${task.tags?.join(', ') || 'None'}
+`;
+  }
+
+  async analyzeProductivityPatterns(user, tasks) {
+    try {
+      const prompt = `
+Analyze this user's productivity patterns and provide insights:
+
+User: ${user.name}
+Total tasks: ${tasks.length}
+Completed tasks: ${tasks.filter(t => t.status === 'completed').length}
+Most common category: ${this.getMostCommonCategory(tasks)}
+Average completion time: ${this.getAverageCompletionTime(tasks)} minutes
+Most productive time: ${this.getMostProductiveTime(tasks)}
+
+Provide 3 personalized insights about their productivity patterns and 2 actionable recommendations.
+Be encouraging and focus on growth opportunities.
+
+Return as JSON object with 'insights' and 'recommendations' arrays.
+`;
+
+      const response = await openai.chat.completions.create({
+        model: this.defaultModel,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 500,
+        temperature: 0.6,
+      });
+
+      return JSON.parse(response.choices[0].message.content);
+    } catch (error) {
+      console.error('Error analyzing productivity patterns:', error);
       return {
-        success: false,
-        error: error.message
+        insights: [
+          'You have a consistent approach to task completion',
+          'Your productivity varies throughout the week',
+          'You work well with structured tasks'
+        ],
+        recommendations: [
+          'Try batching similar tasks together for better efficiency',
+          'Consider setting specific time blocks for different task categories'
+        ]
       };
     }
   }
 
-  // Build context for AI requests
-  async buildContext(user, task, additionalContext) {
-    // Get user's recent tasks
-    const recentTasks = await Task.find({ 
-      user: user._id, 
-      status: 'completed' 
-    })
-    .sort({ completedAt: -1 })
-    .limit(5)
-    .select('title');
-
-    // Get user's preferred categories
-    const categoryStats = await Task.aggregate([
-      { $match: { user: user._id, status: 'completed' } },
-      { $group: { _id: '$category', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 3 }
-    ]);
-
-    // Calculate average completion time
-    const avgCompletionTime = await Task.aggregate([
-      { $match: { user: user._id, status: 'completed', actualDuration: { $exists: true } } },
-      { $group: { _id: null, avgTime: { $avg: '$actualDuration' } } }
-    ]);
-
-    return {
-      userContext: {
-        location: user.location,
-        timeOfDay: this.getTimeOfDay(),
-        weather: additionalContext.weather || 'unknown',
-        mood: additionalContext.mood || 'neutral',
-        energy: additionalContext.energy || 'medium',
-        profession: user.profession,
-        recentTasks: recentTasks.map(t => t.title)
-      },
-      userPreferences: {
-        theme: user.preferences.theme,
-        language: user.preferences.language,
-        notificationFrequency: user.preferences.notifications.frequency
-      },
-      taskContext: {
-        title: task.title,
-        description: task.description,
-        category: task.category,
-        priority: task.priority,
-        dueDate: task.dueDate,
-        progress: task.progress.percentage,
-        estimatedDuration: task.estimatedDuration,
-        actualDuration: task.actualDuration
-      },
-      userStats: {
-        totalTasks: user.stats.totalTasks,
-        completedTasks: user.stats.completedTasks,
-        currentStreak: user.stats.currentStreak,
-        longestStreak: user.stats.longestStreak,
-        level: user.stats.level
-      },
-      preferredCategories: categoryStats.map(cat => cat._id),
-      avgCompletionTime: avgCompletionTime[0]?.avgTime || 30,
-      activeChallenges: additionalContext.activeChallenges || []
-    };
+  getMostCommonCategory(tasks) {
+    const categories = tasks.map(t => t.category);
+    return categories.sort((a, b) =>
+      categories.filter(v => v === a).length - categories.filter(v => v === b).length
+    ).pop();
   }
 
-  // Fill prompt template with context
-  fillPromptTemplate(prompt, context) {
-    return prompt
-      .replace('{profession}', context.userContext.profession)
-      .replace('{location}', context.userContext.location?.city || 'unknown')
-      .replace('{timeOfDay}', context.userContext.timeOfDay)
-      .replace('{mood}', context.userContext.mood)
-      .replace('{energy}', context.userContext.energy)
-      .replace('{recentTasks}', context.userContext.recentTasks.join(', '))
-      .replace('{taskTitle}', context.taskContext.title)
-      .replace('{taskDescription}', context.taskContext.description || '')
-      .replace('{progress}', context.taskContext.progress)
-      .replace('{timeSpent}', context.taskContext.actualDuration || 0)
-      .replace('{estimatedDuration}', context.taskContext.estimatedDuration || 30)
-      .replace('{category}', context.taskContext.category)
-      .replace('{priority}', context.taskContext.priority)
-      .replace('{city}', context.userContext.location?.city || 'unknown')
-      .replace('{country}', context.userContext.location?.country || 'unknown')
-      .replace('{weather}', context.userContext.weather)
-      .replace('{totalTasks}', context.userStats.totalTasks)
-      .replace('{currentStreak}', context.userStats.currentStreak)
-      .replace('{avgCompletionTime}', context.avgCompletionTime)
-      .replace('{preferredCategories}', context.preferredCategories.join(', '))
-      .replace('{mostProductiveTime}', 'morning') // This would be calculated from analytics
-      .replace('{todayCompleted}', 0) // This would be calculated
-      .replace('{overdueTasks}', 0) // This would be calculated
-      .replace('{focusScore}', 75); // This would be calculated
+  getAverageCompletionTime(tasks) {
+    const completedTasks = tasks.filter(t => t.actualDuration);
+    if (completedTasks.length === 0) return 0;
+    return Math.round(completedTasks.reduce((sum, t) => sum + t.actualDuration, 0) / completedTasks.length);
   }
 
-  // Calculate cost based on tokens
-  calculateCost(tokens) {
-    // GPT-4 pricing (approximate)
-    const inputCostPer1K = 0.03;
-    const outputCostPer1K = 0.06;
+  getMostProductiveTime(tasks) {
+    const completedTasks = tasks.filter(t => t.completedAt);
+    if (completedTasks.length === 0) return 'Not enough data';
     
-    const inputCost = (tokens.input / 1000) * inputCostPer1K;
-    const outputCost = (tokens.output / 1000) * outputCostPer1K;
-    const totalCost = inputCost + outputCost;
+    const hours = completedTasks.map(t => new Date(t.completedAt).getHours());
+    const hourCounts = {};
+    hours.forEach(h => hourCounts[h] = (hourCounts[h] || 0) + 1);
     
-    return {
-      inputCost: Math.round(inputCost * 100) / 100,
-      outputCost: Math.round(outputCost * 100) / 100,
-      totalCost: Math.round(totalCost * 100) / 100,
-      currency: 'USD'
-    };
-  }
-
-  // Update user AI usage statistics
-  async updateUserAIStats(userId, tokens, cost) {
-    await User.findByIdAndUpdate(userId, {
-      $inc: {
-        'aiUsage.totalRequests': 1,
-        'aiUsage.tokensUsed': tokens.total,
-        'aiUsage.monthlyRequests': 1,
-        'aiUsage.monthlyTokens': tokens.total
-      },
-      $set: {
-        'aiUsage.lastRequestDate': new Date()
-      }
-    });
-  }
-
-  // Get time of day
-  getTimeOfDay() {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'morning';
-    if (hour < 17) return 'afternoon';
-    if (hour < 21) return 'evening';
-    return 'night';
-  }
-
-  // Get AI usage analytics
-  async getUsageAnalytics(userId, days = 30) {
-    return await AIUsage.getUserStats(userId, days);
-  }
-
-  // Get popular request types
-  async getPopularRequestTypes(days = 7) {
-    return await AIUsage.getPopularRequestTypes(days);
-  }
-
-  // Get feedback insights
-  async getFeedbackInsights(days = 30) {
-    return await AIUsage.getFeedbackInsights(days);
+    const mostProductiveHour = Object.keys(hourCounts).reduce((a, b) => 
+      hourCounts[a] > hourCounts[b] ? a : b
+    );
+    
+    return `${mostProductiveHour}:00`;
   }
 }
 
-module.exports = new AIService(); 
+module.exports = { aiService: new AIService() }; 

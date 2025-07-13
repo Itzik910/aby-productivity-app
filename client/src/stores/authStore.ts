@@ -9,9 +9,10 @@ export interface User {
   avatar?: string;
   profession: string;
   isVerified: boolean;
-  subscription: {
-    plan: 'free' | 'pro' | 'enterprise';
-    currentPeriodEnd?: Date;
+  premium: {
+    isPremium: boolean;
+    upgradeDate?: Date;
+    premiumFeatures: string[];
   };
   stats: {
     totalTasks: number;

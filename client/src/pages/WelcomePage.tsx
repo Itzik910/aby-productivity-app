@@ -56,7 +56,7 @@ const WelcomePage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 dark:from-background-dark dark:via-surface-dark dark:to-background-dark">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
       {/* Navigation */}
       <nav className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
@@ -65,10 +65,10 @@ const WelcomePage: React.FC = () => {
             animate={{ opacity: 1, x: 0 }}
             className="flex items-center space-x-2"
           >
-            <div className="w-8 h-8 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-lg">A</span>
             </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
+            <span className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
               ABY
             </span>
           </motion.div>
@@ -80,13 +80,13 @@ const WelcomePage: React.FC = () => {
           >
             <Link
               to="/login"
-              className="text-gray-600 hover:text-primary-600 dark:text-gray-300 dark:hover:text-primary-400 transition-colors"
+              className="text-gray-600 hover:text-purple-600 transition-colors"
             >
               Login
             </Link>
             <Link
               to="/register"
-              className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg transition-colors"
+              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-colors"
             >
               Get Started
             </Link>
@@ -103,11 +103,11 @@ const WelcomePage: React.FC = () => {
             transition={{ duration: 0.8 }}
             className="text-5xl md:text-7xl font-bold mb-6"
           >
-            <span className="bg-gradient-to-r from-primary-600 via-secondary-600 to-accent-600 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-purple-600 via-blue-600 to-purple-600 bg-clip-text text-transparent">
               Transform Your
             </span>
             <br />
-            <span className="text-gray-800 dark:text-white">
+            <span className="text-gray-800">
               Productivity
             </span>
           </motion.h1>
@@ -116,7 +116,7 @@ const WelcomePage: React.FC = () => {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto"
+            className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto"
           >
             An emotionally engaging, AI-powered task assistant that helps you organize, 
             optimize, and achieve more with intelligent suggestions and location-aware features.
@@ -130,13 +130,13 @@ const WelcomePage: React.FC = () => {
           >
             <Link
               to="/register"
-              className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white px-8 py-4 rounded-xl text-lg font-semibold flex items-center space-x-2 transition-all transform hover:scale-105 shadow-lg"
+              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-4 rounded-xl text-lg font-semibold flex items-center space-x-2 transition-all transform hover:scale-105 shadow-lg"
             >
               <span>Let's Begin</span>
               <ArrowRight className="w-5 h-5" />
             </Link>
             
-            <button className="flex items-center space-x-2 text-gray-600 hover:text-primary-600 dark:text-gray-300 dark:hover:text-primary-400 transition-colors">
+            <button className="flex items-center space-x-2 text-gray-600 hover:text-purple-600 transition-colors">
               <Play className="w-5 h-5" />
               <span>Watch Demo</span>
             </button>
@@ -154,10 +154,10 @@ const WelcomePage: React.FC = () => {
         >
           {stats.map((stat, index) => (
             <div key={index} className="text-center">
-              <div className="text-3xl md:text-4xl font-bold text-primary-600 mb-2">
+              <div className="text-3xl md:text-4xl font-bold text-purple-600 mb-2">
                 {stat.number}
               </div>
-              <div className="text-gray-600 dark:text-gray-300">
+              <div className="text-gray-600">
                 {stat.label}
               </div>
             </div>
@@ -173,10 +173,10 @@ const WelcomePage: React.FC = () => {
           transition={{ duration: 0.8 }}
           className="text-center mb-16"
         >
-          <h2 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
+          <h2 className="text-4xl font-bold text-gray-800 mb-4">
             Why Choose ABY?
           </h2>
-          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Our AI-powered platform combines cutting-edge technology with intuitive design 
             to help you achieve your productivity goals.
           </p>
@@ -189,15 +189,15 @@ const WelcomePage: React.FC = () => {
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: index * 0.1 }}
-              className="bg-white dark:bg-surface-dark p-8 rounded-2xl shadow-soft hover:shadow-medium transition-all transform hover:-translate-y-2"
+              className="bg-white p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-2"
             >
-              <div className="w-12 h-12 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center text-white mb-6">
+              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl flex items-center justify-center text-white mb-6">
                 {feature.icon}
               </div>
-              <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
+              <h3 className="text-xl font-semibold text-gray-800 mb-4">
                 {feature.title}
               </h3>
-              <p className="text-gray-600 dark:text-gray-300">
+              <p className="text-gray-600">
                 {feature.description}
               </p>
             </motion.div>
@@ -211,44 +211,23 @@ const WelcomePage: React.FC = () => {
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
-          className="bg-gradient-to-r from-primary-600 to-secondary-600 rounded-3xl p-12 text-center text-white"
+          className="text-center max-w-4xl mx-auto"
         >
-          <h2 className="text-4xl font-bold mb-4">
-            Ready to Boost Your Productivity?
+          <h2 className="text-4xl font-bold text-gray-800 mb-6">
+            Ready to Get Started?
           </h2>
-          <p className="text-xl mb-8 opacity-90">
-            Join thousands of users who have transformed their daily routines with ABY.
+          <p className="text-xl text-gray-600 mb-8">
+            Join thousands of users who have transformed their productivity with ABY.
           </p>
           <Link
             to="/register"
-            className="bg-white text-primary-600 hover:bg-gray-100 px-8 py-4 rounded-xl text-lg font-semibold inline-flex items-center space-x-2 transition-all transform hover:scale-105"
+            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-4 rounded-xl text-lg font-semibold inline-flex items-center space-x-2 transition-all transform hover:scale-105 shadow-lg"
           >
             <span>Start Your Journey</span>
             <ArrowRight className="w-5 h-5" />
           </Link>
         </motion.div>
       </section>
-
-      {/* Footer */}
-      <footer className="container mx-auto px-6 py-12 border-t border-gray-200 dark:border-gray-700">
-        <div className="flex flex-col md:flex-row items-center justify-between">
-          <div className="flex items-center space-x-2 mb-4 md:mb-0">
-            <div className="w-6 h-6 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">A</span>
-            </div>
-            <span className="text-lg font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-              ABY
-            </span>
-          </div>
-          
-          <div className="flex items-center space-x-6 text-sm text-gray-600 dark:text-gray-300">
-            <a href="#" className="hover:text-primary-600 transition-colors">Privacy</a>
-            <a href="#" className="hover:text-primary-600 transition-colors">Terms</a>
-            <a href="#" className="hover:text-primary-600 transition-colors">Support</a>
-            <span>© 2024 ABY Productivity. All rights reserved.</span>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };

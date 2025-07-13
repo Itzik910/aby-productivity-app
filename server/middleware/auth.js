@@ -56,8 +56,8 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
-// Middleware to check if user has Pro subscription
-const requirePro = async (req, res, next) => {
+// Middleware to check if user has Premium access
+const requirePremium = async (req, res, next) => {
   try {
     if (!req.user) {
       return res.status(401).json({
@@ -66,27 +66,17 @@ const requirePro = async (req, res, next) => {
       });
     }
 
-    if (req.user.subscription.plan === 'free') {
+    if (!req.user.premium.isPremium) {
       return res.status(403).json({
         success: false,
-        message: 'Pro subscription required for this feature',
-        upgradeRequired: true
-      });
-    }
-
-    // Check if subscription is still active
-    if (req.user.subscription.currentPeriodEnd && 
-        new Date() > req.user.subscription.currentPeriodEnd) {
-      return res.status(403).json({
-        success: false,
-        message: 'Subscription expired',
+        message: 'Premium access required for this feature',
         upgradeRequired: true
       });
     }
 
     next();
   } catch (error) {
-    console.error('Pro middleware error:', error);
+    console.error('Premium middleware error:', error);
     return res.status(500).json({
       success: false,
       message: 'Authorization error'
@@ -158,8 +148,8 @@ const checkAILimit = async (req, res, next) => {
       });
     }
 
-    // Pro users have unlimited AI usage
-    if (req.user.subscription.plan !== 'free') {
+    // Premium users have unlimited AI usage
+    if (req.user.premium.isPremium) {
       return next();
     }
 
@@ -187,7 +177,7 @@ const checkAILimit = async (req, res, next) => {
     if (req.user.aiUsage.monthlyRequests >= monthlyLimit) {
       return res.status(429).json({
         success: false,
-        message: 'Monthly AI usage limit reached. Upgrade to Pro for unlimited AI suggestions.',
+        message: 'Monthly AI usage limit reached. Complete your profile to unlock premium features.',
         upgradeRequired: true,
         limit: monthlyLimit,
         used: req.user.aiUsage.monthlyRequests
@@ -199,27 +189,27 @@ const checkAILimit = async (req, res, next) => {
     console.error('AI limit middleware error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Usage limit check error'
+      message: 'Authorization error'
     });
   }
 };
 
-// Middleware to update last activity
+// Middleware to update user's last activity
 const updateLastActivity = async (req, res, next) => {
   try {
     if (req.user) {
       await User.findByIdAndUpdate(req.user._id, {
-        $set: { lastLogin: new Date() }
+        lastActivity: new Date()
       });
     }
     next();
   } catch (error) {
-    console.error('Update last activity error:', error);
-    next(); // Don't block the request if this fails
+    console.error('Update activity middleware error:', error);
+    next(); // Don't block the request for this
   }
 };
 
-// Middleware to check device limit
+// Middleware to check device limits
 const checkDeviceLimit = async (req, res, next) => {
   try {
     if (!req.user) {
@@ -229,18 +219,14 @@ const checkDeviceLimit = async (req, res, next) => {
       });
     }
 
-    const deviceId = req.headers['device-id'];
-    if (!deviceId) {
-      return next(); // Skip device check if no device ID
-    }
-
-    const maxDevices = req.user.subscription.plan === 'pro' ? 5 : 2;
-    const activeDevices = req.user.devices.filter(d => d.isActive);
+    const deviceId = req.headers['device-id'] || req.ip;
+    const maxDevices = req.user.premium.isPremium ? 5 : 2; // Premium users can use 5 devices, free users 2
 
     // Check if device is already registered
-    const existingDevice = req.user.devices.find(d => d.deviceId === deviceId);
+    const existingDevice = req.user.devices.find(device => device.deviceId === deviceId);
     if (existingDevice) {
-      // Update last activity
+      // Update last active time
+      existingDevice.lastActive = new Date();
       await User.findByIdAndUpdate(req.user._id, {
         $set: {
           'devices.$[device].lastActive': new Date()
@@ -251,56 +237,72 @@ const checkDeviceLimit = async (req, res, next) => {
       return next();
     }
 
-    // Check device limit
-    if (activeDevices.length >= maxDevices) {
+    // Check if user has reached device limit
+    if (req.user.devices.length >= maxDevices) {
       return res.status(403).json({
         success: false,
-        message: `Device limit reached. Maximum ${maxDevices} devices allowed for ${req.user.subscription.plan} plan.`,
-        upgradeRequired: req.user.subscription.plan === 'free'
+        message: `Device limit reached. You can use up to ${maxDevices} devices.`,
+        upgradeRequired: !req.user.premium.isPremium,
+        limit: maxDevices
       });
     }
+
+    // Register new device
+    req.user.devices.push({
+      deviceId,
+      deviceName: req.headers['device-name'] || 'Unknown Device',
+      lastActive: new Date(),
+      isActive: true
+    });
+
+    await User.findByIdAndUpdate(req.user._id, {
+      $push: {
+        devices: {
+          deviceId,
+          deviceName: req.headers['device-name'] || 'Unknown Device',
+          lastActive: new Date(),
+          isActive: true
+        }
+      }
+    });
 
     next();
   } catch (error) {
     console.error('Device limit middleware error:', error);
-    next(); // Don't block the request if this fails
+    return res.status(500).json({
+      success: false,
+      message: 'Authorization error'
+    });
   }
 };
 
-// Generate JWT token
+// Helper function to generate JWT token
 const generateToken = (userId) => {
   return jwt.sign(
     { userId },
     process.env.JWT_SECRET,
+    { expiresIn: '15m' }
+  );
+};
+
+// Helper function to generate refresh token
+const generateRefreshToken = (userId) => {
+  return jwt.sign(
+    { userId },
+    process.env.JWT_REFRESH_SECRET,
     { expiresIn: '7d' }
   );
 };
 
-// Generate refresh token
-const generateRefreshToken = (userId) => {
-  return jwt.sign(
-    { userId, type: 'refresh' },
-    process.env.JWT_REFRESH_SECRET,
-    { expiresIn: '30d' }
-  );
-};
-
-// Verify refresh token
+// Helper function to verify refresh token
 const verifyRefreshToken = (token) => {
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
-    if (decoded.type !== 'refresh') {
-      throw new Error('Invalid token type');
-    }
-    return decoded;
-  } catch (error) {
-    throw error;
-  }
+  return jwt.verify(token, process.env.JWT_REFRESH_SECRET);
 };
 
 module.exports = {
+  auth: authenticateToken, // Alias for backward compatibility
   authenticateToken,
-  requirePro,
+  requirePremium,
   requireAdmin,
   requireSponsor,
   checkAILimit,
