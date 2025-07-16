@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { 
   TrendingUp, 
   Calendar, 
@@ -54,7 +55,14 @@ interface Achievement {
 }
 
 const DashboardPage: React.FC = () => {
-  const { user } = useAuthStore();
+  console.log('[DASHBOARD PAGE] Component rendering, auth state:', {
+    isAuthenticated: useAuthStore.getState().isAuthenticated,
+    user: useAuthStore.getState().user,
+    token: useAuthStore.getState().token
+  });
+
+  const { user, isAuthenticated } = useAuthStore();
+  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentTasks, setRecentTasks] = useState<RecentTask[]>([]);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
@@ -63,6 +71,8 @@ const DashboardPage: React.FC = () => {
   const [selectedTimeRange, setSelectedTimeRange] = useState('week');
 
   useEffect(() => {
+    console.log('[DASHBOARD PAGE] useEffect triggered, isAuthenticated:', isAuthenticated);
+    
     fetchDashboardData();
     fetchMotivationalMessage();
   }, [selectedTimeRange]);

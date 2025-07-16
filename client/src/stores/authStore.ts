@@ -80,10 +80,15 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       login: async (email: string, password: string) => {
         set({ isLoading: true, error: null });
         
+        console.log('[AUTH STORE] Starting login with email:', email);
+        
         try {
+          console.log('[AUTH STORE] Making API call to /auth/login');
           const response = await api.post('/auth/login', { email, password });
+          console.log('[AUTH STORE] Login API response received:', response.status, response.data);
           const { user, token, refreshToken } = response.data.data;
           
+          console.log('[AUTH STORE] Setting auth state with user:', user);
           set({
             user,
             token,
@@ -95,7 +100,11 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
           // Set auth header for future requests
           api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          console.log('[AUTH STORE] Login completed successfully');
         } catch (error: any) {
+          console.error('[AUTH STORE] Login failed with error:', error);
+          console.error('[AUTH STORE] Login error response:', error.response?.data);
+          console.error('[AUTH STORE] Login error status:', error.response?.status);
           set({
             isLoading: false,
             error: error.response?.data?.message || 'Login failed',
@@ -107,10 +116,15 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       register: async (userData: RegisterData) => {
         set({ isLoading: true, error: null });
         
+        console.log('[AUTH STORE] Starting registration with data:', userData);
+        
         try {
+          console.log('[AUTH STORE] Making API call to /auth/register');
           const response = await api.post('/auth/register', userData);
+          console.log('[AUTH STORE] API response received:', response.status, response.data);
           const { user, token, refreshToken } = response.data.data;
           
+          console.log('[AUTH STORE] Setting auth state with user:', user);
           set({
             user,
             token,
@@ -122,7 +136,11 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
           // Set auth header for future requests
           api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          console.log('[AUTH STORE] Registration completed successfully');
         } catch (error: any) {
+          console.error('[AUTH STORE] Registration failed with error:', error);
+          console.error('[AUTH STORE] Error response:', error.response?.data);
+          console.error('[AUTH STORE] Error status:', error.response?.status);
           set({
             isLoading: false,
             error: error.response?.data?.message || 'Registration failed',

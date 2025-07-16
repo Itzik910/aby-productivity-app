@@ -74,7 +74,9 @@ api.interceptors.response.use(
       } catch (refreshError) {
         // Refresh failed, redirect to login
         localStorage.removeItem('auth-storage');
-        window.location.href = '/login';
+        // Don't use hard redirect as it interferes with React Router
+        // Let the ProtectedRoute component handle this naturally
+        console.warn('[API] Token refresh failed, auth state cleared. ProtectedRoute will handle redirect.');
         return Promise.reject(refreshError);
       }
     }

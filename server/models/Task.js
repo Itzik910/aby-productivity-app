@@ -85,13 +85,9 @@ const taskSchema = new mongoose.Schema({
     coordinates: {
       type: {
         type: String,
-        enum: ['Point'],
-        default: 'Point'
+        enum: ['Point']
       },
-      coordinates: {
-        type: [Number],
-        default: undefined
-      }
+      coordinates: [Number]
     },
     radius: {
       type: Number, // in meters
@@ -114,7 +110,7 @@ const taskSchema = new mongoose.Schema({
     suggestion: String,
     type: {
       type: String,
-      enum: ['completion', 'optimization', 'location', 'timing', 'collaboration'],
+      enum: ['completion', 'optimization', 'location', 'timing', 'collaboration', 'diy', 'service'],
       required: true
     },
     confidence: {
@@ -369,5 +365,20 @@ taskSchema.statics.findOverdue = function(userId) {
     dueDate: { $lt: new Date() }
   });
 };
+
+// Pre-save hook to clean up location coordinates
+taskSchema.pre('save', function(next) {
+  // Clean up coordinates if they're not properly set
+  if (this.location && this.location.coordinates) {
+    // If coordinates object exists but coordinates array is empty/invalid, remove it
+    if (!this.location.coordinates.coordinates || 
+        !Array.isArray(this.location.coordinates.coordinates) || 
+        this.location.coordinates.coordinates.length !== 2 ||
+        this.location.coordinates.coordinates.some(coord => typeof coord !== 'number')) {
+      this.location.coordinates = undefined;
+    }
+  }
+  next();
+});
 
 module.exports = mongoose.model('Task', taskSchema); 

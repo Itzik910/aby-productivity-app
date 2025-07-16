@@ -19,7 +19,7 @@ router.get('/dashboard', auth, async (req, res) => {
     const startOfYear = new Date(now.getFullYear(), 0, 1);
 
     // Get user's tasks
-    const allTasks = await Task.find({ userId }).sort({ createdAt: -1 });
+    const allTasks = await Task.find({ user: userId }).sort({ createdAt: -1 });
     const todayTasks = allTasks.filter(task => task.createdAt >= startOfDay);
     const weekTasks = allTasks.filter(task => task.createdAt >= startOfWeek);
     const monthTasks = allTasks.filter(task => task.createdAt >= startOfMonth);
@@ -128,7 +128,7 @@ router.get('/dashboard', auth, async (req, res) => {
     });
 
     // AI usage stats
-    const aiUsage = await AIUsage.find({ userId }).sort({ timestamp: -1 }).limit(100);
+    const aiUsage = await AIUsage.find({ user: userId }).sort({ timestamp: -1 }).limit(100);
     const aiUsageToday = aiUsage.filter(usage => usage.timestamp >= startOfDay);
     const aiUsageWeek = aiUsage.filter(usage => usage.timestamp >= startOfWeek);
 
@@ -263,7 +263,7 @@ router.get('/productivity-trends', auth, async (req, res) => {
     }
 
     const tasks = await Task.find({
-      userId,
+      user: userId,
       createdAt: { $gte: startDate }
     }).sort({ createdAt: 1 });
 
@@ -317,7 +317,7 @@ router.get('/productivity-trends', auth, async (req, res) => {
 router.get('/time-distribution', auth, async (req, res) => {
   try {
     const userId = req.user.id;
-    const tasks = await Task.find({ userId, status: 'completed' });
+    const tasks = await Task.find({ user: userId, status: 'completed' });
 
     const categoryDistribution = {};
     const priorityDistribution = {};

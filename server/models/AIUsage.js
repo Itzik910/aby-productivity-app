@@ -44,7 +44,7 @@ const aiUsageSchema = new mongoose.Schema({
       text: String,
       type: {
         type: String,
-        enum: ['completion', 'optimization', 'location', 'timing', 'collaboration'],
+        enum: ['completion', 'optimization', 'location', 'timing', 'collaboration', 'diy', 'service'],
         required: true
       },
       confidence: {

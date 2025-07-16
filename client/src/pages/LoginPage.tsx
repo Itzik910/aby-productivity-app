@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { Eye, EyeOff, Mail, Lock, LogIn, ArrowLeft } from 'lucide-react';
 
@@ -9,8 +9,19 @@ const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   
-  const { login, isLoading, error } = useAuthStore();
+  const { login, isLoading, error, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  console.log('[LOGIN PAGE] Current location:', location.pathname);
+ 
+ // Redirect authenticated users to dashboard
+ React.useEffect(() => {
+   if (isAuthenticated) {
+     console.log('[LOGIN PAGE] User already authenticated, redirecting to dashboard');
+     navigate('/dashboard', { replace: true });
+   }
+ }, [isAuthenticated, navigate]);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -34,13 +45,23 @@ const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('[LOGIN PAGE] Form submitted with data:', { email: email, password: '***' });
+    
     if (!validateForm()) return;
     
     try {
+      console.log('[LOGIN PAGE] Calling login function...');
       await login(email, password);
+      console.log('[LOGIN PAGE] Login successful, navigating to dashboard');
+      console.log('[LOGIN PAGE] Current location before navigate:', location.pathname);
       navigate('/dashboard');
+      console.log('[LOGIN PAGE] Navigation to dashboard called');
+      // Check if navigation actually happened
+      setTimeout(() => {
+        console.log('[LOGIN PAGE] Location after navigate (delayed check):', window.location.pathname);
+      }, 100);
     } catch (error) {
-      console.error('Login failed:', error);
+      console.error('[LOGIN PAGE] Login failed in handleSubmit catch block:', error);
     }
   };
 

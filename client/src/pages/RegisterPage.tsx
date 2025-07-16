@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { Eye, EyeOff, Mail, Lock, User, Briefcase, MapPin, UserPlus, ArrowLeft } from 'lucide-react';
@@ -19,8 +19,22 @@ const RegisterPage: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [step, setStep] = useState(1);
   
-  const { register, isLoading, error } = useAuthStore();
+  const { register, isLoading, error, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (error) {
+      console.error('Auth store reported an error:', error);
+    }
+  }, [error]);
+ 
+ // Redirect authenticated users to dashboard
+ useEffect(() => {
+   if (isAuthenticated) {
+     console.log('[REGISTER PAGE] User already authenticated, redirecting to dashboard');
+     navigate('/dashboard', { replace: true });
+   }
+ }, [isAuthenticated, navigate]);
 
   const professions = [
     { value: 'student', label: 'Student' },
@@ -95,9 +109,9 @@ const RegisterPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateStep2()) return;
-    
+
     try {
       const registerData = {
         name: formData.name,
@@ -112,11 +126,20 @@ const RegisterPage: React.FC = () => {
           }
         }
       };
-      
+
+      console.log('Submitting registration data:', registerData); // Debug log
+
       await register(registerData);
+      console.log('Registration succeeded, navigating to dashboard'); // Debug log
+      console.log('[REGISTER PAGE] Current auth state before navigation:', { 
+        isAuthenticated: useAuthStore.getState().isAuthenticated,
+        user: useAuthStore.getState().user,
+        token: useAuthStore.getState().token 
+      });
       navigate('/dashboard');
+      console.log('[REGISTER PAGE] Navigation to dashboard called');
     } catch (error) {
-      console.error('Registration failed:', error);
+      console.error('Registration failed in handleSubmit catch block:', error);
     }
   };
 

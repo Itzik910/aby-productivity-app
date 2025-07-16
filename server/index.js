@@ -10,6 +10,19 @@ const http = require('http');
 const socketIo = require('socket.io');
 require('dotenv').config();
 
+// Explicitly load environment variables from server/.env regardless of the
+// directory from which the process is started. This avoids the situation where
+// `dotenv` looks in the wrong place when the server is launched via nested npm
+// scripts.
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+
+// Debug: confirm variables loaded (comment out if you don't want this noise)
+if (!process.env.MONGODB_URI) {
+  console.warn('[WARN] MONGODB_URI is not defined after loading .env');
+} else {
+  console.log('[DEBUG] Loaded MONGODB_URI from .env:', process.env.MONGODB_URI.slice(0, 50) + '...');
+}
+
 // Import routes
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
@@ -176,7 +189,7 @@ app.use('*', (req, res) => {
 // Global error handler
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);

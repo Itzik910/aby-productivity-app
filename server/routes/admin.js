@@ -300,10 +300,10 @@ router.get('/users/:id', auth, isAdmin, async (req, res) => {
     }
 
     // Get user's tasks
-    const tasks = await Task.find({ userId }).sort({ createdAt: -1 }).limit(50);
+    const tasks = await Task.find({ user: userId }).sort({ createdAt: -1 }).limit(50);
     
     // Get user's AI usage
-    const aiUsage = await AIUsage.find({ userId }).sort({ timestamp: -1 }).limit(50);
+    const aiUsage = await AIUsage.find({ user: userId }).sort({ timestamp: -1 }).limit(50);
     
     // Get user's challenge participation
     const challenges = await Challenge.find({ participants: userId }).sort({ createdAt: -1 });
@@ -625,7 +625,7 @@ router.get('/export', auth, isAdmin, async (req, res) => {
         filename = 'users-export';
         break;
       case 'tasks':
-        data = await Task.find().populate('userId', 'name email');
+        data = await Task.find().populate('user', 'name email');
         filename = 'tasks-export';
         break;
       case 'challenges':

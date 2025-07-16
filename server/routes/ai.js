@@ -12,6 +12,34 @@ router.use(auth);
 router.use(checkAIUsageLimit);
 router.use(addUsageHeaders);
 
+// Test endpoint to demonstrate the two-stage AI process
+router.post('/test-two-stage', async (req, res) => {
+  try {
+    const { task, user } = req.body;
+    
+    // Simulate what would happen with available OpenAI quota
+    const mockStage1Response = `Generate 5 specific, actionable suggestions for a ${user.age || 30}-year-old ${user.profession || 'professional'} in ${user.location?.city || 'their city'} to complete the task '${task.title}'. Consider their ${user.workSchedule || 'busy'} schedule, ${user.stressLevel || 'moderate'} stress level, and need for efficient solutions. Include specific local businesses, time-efficient strategies, and practical immediate actions they can take.`;
+    
+    const mockStage2Response = [
+      {"header": "Downtown Coffee Shop - 2 blocks away", "details": "Visit Starbucks on Main St during lunch break. They have WiFi and quiet corner seats perfect for planning tasks.", "type": "location", "actionable": true},
+      {"header": "15-minute morning routine", "details": "Start each day with 5 minutes of planning, 5 minutes of stretching, and 5 minutes of priority setting.", "type": "timing", "actionable": true},
+      {"header": "Task completion app", "details": "Download Todoist or Any.do app to break this task into 3 smaller subtasks with reminders.", "type": "service", "actionable": true},
+      {"header": "Ask colleague for advice", "details": "Text your most organized coworker for their approach to similar tasks. Set 10-minute chat for tomorrow.", "type": "collaboration", "actionable": true},
+      {"header": "DIY preparation checklist", "details": "Create a simple checklist with 5 steps needed to complete this task. Keep it visible on your desk.", "type": "diy", "actionable": true}
+    ];
+    
+    res.json({
+      success: true,
+      stage1_prompt: mockStage1Response,
+      stage2_suggestions: mockStage2Response,
+      note: "This is what the two-stage AI would produce with available OpenAI quota",
+      current_issue: "OpenAI quota exceeded - system falling back to contextual suggestions"
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // @route   POST /api/ai/suggestions
 // @desc    Get AI-powered task suggestions
 // @access  Private
@@ -21,7 +49,7 @@ router.post('/suggestions', logAIUsage, async (req, res) => {
     const { context, preferences } = req.body;
 
     // Get user's recent tasks and patterns
-    const recentTasks = await Task.find({ userId })
+    const recentTasks = await Task.find({ user: userId })
       .sort({ createdAt: -1 })
       .limit(50);
 
@@ -66,16 +94,16 @@ router.post('/suggestions', logAIUsage, async (req, res) => {
   }
 });
 
-// @route   POST /api/ai/motivation
-// @desc    Get AI-generated motivational message
+// @route   POST /api/ai/motivational-message
+// @desc    Get AI-generated motivational message  
 // @access  Private
-router.post('/motivation', logAIUsage, async (req, res) => {
+router.post('/motivational-message', logAIUsage, async (req, res) => {
   try {
     const userId = req.user.id;
     const { mood, context } = req.body;
 
     // Get user's recent activity
-    const recentTasks = await Task.find({ userId })
+    const recentTasks = await Task.find({ user: userId })
       .sort({ createdAt: -1 })
       .limit(10);
 
@@ -98,7 +126,7 @@ router.post('/motivation', logAIUsage, async (req, res) => {
     };
 
     // Generate motivational message
-    const motivationData = await generateMotivationalMessage(motivationContext);
+    const motivationData = await generateMotivationalMessage(user, motivationContext);
 
     // Set tokens used for logging
     req.aiTokensUsed = motivationData.tokensUsed || 0;
@@ -145,7 +173,7 @@ router.post('/analyze-productivity', checkFeatureAccess('premium'), logAIUsage, 
     }
 
     const tasks = await Task.find({
-      userId,
+      user: userId,
       createdAt: { $gte: startDate }
     }).sort({ createdAt: -1 });
 
@@ -206,7 +234,7 @@ router.post('/optimize-task', logAIUsage, async (req, res) => {
 
     let task;
     if (taskId) {
-      task = await Task.findOne({ _id: taskId, userId });
+      task = await Task.findOne({ _id: taskId, user: userId });
       if (!task) {
         return res.status(404).json({
           success: false,
@@ -224,7 +252,7 @@ router.post('/optimize-task', logAIUsage, async (req, res) => {
 
     // Get related tasks for context
     const relatedTasks = await Task.find({
-      userId,
+      user: userId,
       category: task.category,
       status: 'completed'
     }).limit(10);
@@ -289,7 +317,7 @@ router.post('/smart-scheduling', checkFeatureAccess('premium'), logAIUsage, asyn
     const { tasks, preferences, timeSlots } = req.body;
 
     // Get user's historical data
-    const historicalTasks = await Task.find({ userId, status: 'completed' })
+    const historicalTasks = await Task.find({ user: userId, status: 'completed' })
       .sort({ completedAt: -1 })
       .limit(100);
 

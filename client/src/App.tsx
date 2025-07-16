@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 
 // Pages
@@ -34,25 +34,38 @@ const LoadingSpinner = ({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) => {
 
 // Simple protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isLoading } = useAuthStore();
   
+  console.log('[PROTECTED ROUTE] Auth check:', { isAuthenticated, isLoading });
+ 
+  // Show loading while auth state is being determined
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+ 
   if (!isAuthenticated) {
+    console.log('[PROTECTED ROUTE] Not authenticated, showing login prompt');
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50">
         <div className="text-center">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">🔐 Login Required</h1>
           <p className="text-xl text-gray-600 mb-8">Please log in to access this feature</p>
-          <a 
-            href="/" 
+          <Link
+            to="/login" 
             className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors"
           >
-            Go to Welcome Page
-          </a>
+            Sign In
+          </Link>
         </div>
       </div>
     );
   }
   
+  console.log('[PROTECTED ROUTE] Authenticated, rendering protected content');
   return <>{children}</>;
 };
 
@@ -80,21 +93,21 @@ function App() {
           {/* Public Routes */}
           <Route path="/" element={<WelcomePage />} />
           
-          {/* Main App Routes */}
-          <Route path="/tasks" element={<TasksPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/challenges" element={<ChallengesPage />} />
-          <Route path="/premium" element={<PremiumUpgradePage />} />
-          
           {/* Auth Routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           
+          {/* Main App Routes */}
+          <Route path="/tasks" element={<ProtectedRoute><TasksPage /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+          <Route path="/challenges" element={<ProtectedRoute><ChallengesPage /></ProtectedRoute>} />
+          <Route path="/premium" element={<ProtectedRoute><PremiumUpgradePage /></ProtectedRoute>} />
+          
           {/* Other routes */}
-          <Route path="/calendar" element={<CalendarPage />} />
-          <Route path="/analytics" element={<AnalyticsPage />} />
-          <Route path="/achievements" element={<AchievementsPage />} />
+          <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
+          <Route path="/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
+          <Route path="/achievements" element={<ProtectedRoute><AchievementsPage /></ProtectedRoute>} />
           
           {/* Catch all route */}
           <Route path="*" element={

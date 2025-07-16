@@ -104,7 +104,12 @@ router.post('/register', registerValidation, async (req, res) => {
     // Send verification email (if email is configured)
     if (transporter) {
       const verificationUrl = `${process.env.CLIENT_URL}/verify-email?token=${verificationToken}`;
-      await sendVerificationEmail(user.email, user.name, verificationUrl);
+      try {
+        await sendVerificationEmail(user.email, user.name, verificationUrl);
+      } catch (emailError) {
+        // Email failure shouldn t block successful registration – log and continue
+        console.error('Email sending failed (continuing without interruption):', emailError.message);
+      }
     }
 
     // Generate tokens

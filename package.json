@@ -5,6 +5,7 @@
   "main": "server/index.js",
   "scripts": {
     "start": "concurrently \"npm run server\" \"npm run client\"",
+    "clean-start": "npx kill-port 3000 5000 && npm start",
     "server": "cd server && npm run dev",
     "client": "cd client && npm start",
     "admin": "cd admin && npm start",

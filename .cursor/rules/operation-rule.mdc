@@ -1,0 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+do not edit the .env file both server and client.
+
+if missing any key for API start the app but disable the mossong feature.

@@ -346,6 +346,9 @@ router.get('/analytics/summary', auth, async (req, res) => {
 
 // Request AI suggestions for existing task
 router.post('/:id/ai-suggestions', auth, async (req, res) => {
+  const startTime = Date.now();
+  let aiUsageData = null;
+  
   try {
     const task = await Task.findOne({
       _id: req.params.id,
@@ -363,36 +366,100 @@ router.post('/:id/ai-suggestions', auth, async (req, res) => {
       return res.status(403).json({ message: 'AI usage limit reached. Upgrade to premium for unlimited access.' });
     }
 
-    const suggestions = await aiService.generateTaskSuggestions(task, user);
+    // Generate suggestions with proper usage tracking
+    const result = await aiService.generateTaskSuggestionsWithUsage(task, user);
+    const responseTime = Date.now() - startTime;
     
-    // Add suggestions to task
-    const newSuggestions = suggestions.map(suggestion => ({
-      suggestion,
-      type: req.body.type || 'completion',
+    // Add suggestions to task (convert structured suggestions to task format)
+    const newSuggestions = result.suggestions.map(suggestion => ({
+      suggestion: suggestion.header, // Store the header as the main suggestion
+      type: suggestion.type,
       confidence: 0.8
     }));
 
     task.aiSuggestions.push(...newSuggestions);
     await task.save();
 
-    // Track AI usage
-    await AIUsage.create({
-      user: req.user.id,
-      endpoint: 'task-suggestions',
-      tokensUsed: 150,
-      success: true
-    });
+    // Track AI usage only if we have valid usage data
+    if (result.usageData) {
+      try {
+        aiUsageData = {
+          user: req.user.id,
+          requestType: 'task_suggestion',
+          input: {
+            taskTitle: task.title,
+            taskDescription: task.description
+          },
+          response: {
+            suggestions: newSuggestions.map(s => ({
+              text: s.suggestion,
+              type: s.type,
+              confidence: s.confidence
+            }))
+          },
+          tokens: {
+            input: result.usageData.inputTokens || 0,
+            output: result.usageData.outputTokens || 0,
+            total: result.usageData.totalTokens || 0
+          },
+          performance: {
+            responseTime,
+            errorOccurred: result.usageData.error || false,
+            errorMessage: result.usageData.errorMessage
+          },
+          model: {
+            name: result.usageData.model || 'gpt-4',
+            temperature: 0.7,
+            maxTokens: 1000
+          }
+        };
 
-    // Update user AI usage
+        await AIUsage.create(aiUsageData);
+      } catch (usageError) {
+        console.error('Error tracking AI usage:', usageError);
+        // Don't fail the request if usage tracking fails
+      }
+    }
+
+    // Update user AI usage counter
     if (!user.premium?.isPremium) {
       await User.findByIdAndUpdate(req.user.id, {
         $inc: { 'aiUsage.dailyUsage': 1 }
       });
     }
 
-    res.json(newSuggestions);
+    // Return the structured suggestions to the frontend
+    res.json(result.suggestions);
   } catch (error) {
     console.error('Error generating AI suggestions:', error);
+    
+    // Track failed request if we have timing data
+    if (aiUsageData === null) {
+      try {
+        await AIUsage.create({
+          user: req.user.id,
+          requestType: 'task_suggestion',
+          tokens: {
+            input: 0,
+            output: 0,
+            total: 0
+          },
+          performance: {
+            responseTime: Date.now() - startTime,
+            errorOccurred: true,
+            errorMessage: error.message
+          },
+          model: {
+            name: 'gpt-4',
+            temperature: 0.7,
+            maxTokens: 1000
+          }
+        });
+      } catch (usageError) {
+        console.error('Error tracking failed AI usage:', usageError);
+      }
+    }
+    
     res.status(500).json({ message: 'Server error' });
   }
 });

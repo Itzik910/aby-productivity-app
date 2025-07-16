@@ -16,11 +16,24 @@ import {
   Zap,
   Target,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  ChevronDown,
+  ChevronRight,
+  ExternalLink,
+  Users,
+  Home,
+  Wrench
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
+
+interface AISuggestion {
+  header: string;
+  details: string;
+  type: 'location' | 'diy' | 'service' | 'timing' | 'collaboration';
+  actionable: boolean;
+}
 
 interface Task {
   _id: string;
@@ -66,7 +79,8 @@ const TasksPage: React.FC = () => {
   const [sortBy, setSortBy] = useState('dueDate');
   const [showFilters, setShowFilters] = useState(false);
   const [showAISuggestions, setShowAISuggestions] = useState(false);
-  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
+  const [expandedSuggestion, setExpandedSuggestion] = useState<number | null>(null);
   const [generatingAI, setGeneratingAI] = useState(false);
 
   // New task form state
@@ -232,8 +246,10 @@ const TasksPage: React.FC = () => {
     try {
       setGeneratingAI(true);
       const response = await api.post(`/tasks/${task._id}/ai-suggestions`);
-      setAiSuggestions(response.data.map((s: any) => s.suggestion));
+      // The backend now returns structured suggestions directly
+      setAiSuggestions(response.data);
       setSelectedTask(task);
+      setExpandedSuggestion(null); // Reset expanded state
       setShowAISuggestions(true);
     } catch (error: any) {
       console.error('Error generating AI suggestions:', error);
@@ -693,21 +709,80 @@ const TasksPage: React.FC = () => {
                 </div>
 
                 <div className="space-y-3">
-                  {aiSuggestions.map((suggestion, index) => (
-                    <div key={index} className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
-                      <div className="flex items-start space-x-3">
-                        <div className="w-6 h-6 bg-purple-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
-                          {index + 1}
-                        </div>
-                        <p className="text-gray-700 flex-1">{suggestion}</p>
+                  {aiSuggestions.map((suggestion, index) => {
+                    const isExpanded = expandedSuggestion === index;
+                    const typeIcons = {
+                      location: MapPin,
+                      diy: Home,
+                      service: ExternalLink,
+                      timing: Clock,
+                      collaboration: Users
+                    };
+                    const TypeIcon = typeIcons[suggestion.type] || Wrench;
+                    
+                    return (
+                      <div key={index} className="border border-gray-200 rounded-xl overflow-hidden">
+                        <button
+                          onClick={() => setExpandedSuggestion(isExpanded ? null : index)}
+                          className="w-full p-4 bg-gradient-to-r from-purple-50 to-blue-50 hover:from-purple-100 hover:to-blue-100 transition-all duration-200 text-left"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-8 h-8 bg-purple-600 text-white rounded-lg flex items-center justify-center">
+                                <TypeIcon className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <h4 className="font-semibold text-gray-900">{suggestion.header}</h4>
+                                <span className="text-xs text-purple-600 font-medium capitalize">{suggestion.type}</span>
+                              </div>
+                            </div>
+                            {isExpanded ? 
+                              <ChevronDown className="w-5 h-5 text-gray-400" /> : 
+                              <ChevronRight className="w-5 h-5 text-gray-400" />
+                            }
+                          </div>
+                        </button>
+                        
+                        <AnimatePresence>
+                          {isExpanded && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="bg-white border-t border-gray-100"
+                            >
+                              <div className="p-4">
+                                <p className="text-gray-700 leading-relaxed">{suggestion.details}</p>
+                                <div className="mt-3 flex items-center space-x-2">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    Actionable
+                                  </span>
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                    suggestion.type === 'location' ? 'bg-blue-100 text-blue-800' :
+                                    suggestion.type === 'diy' ? 'bg-orange-100 text-orange-800' :
+                                    suggestion.type === 'service' ? 'bg-purple-100 text-purple-800' :
+                                    suggestion.type === 'timing' ? 'bg-yellow-100 text-yellow-800' :
+                                    'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {suggestion.type}
+                                  </span>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className="flex justify-end space-x-3 mt-6">
                   <button
-                    onClick={() => setShowAISuggestions(false)}
+                    onClick={() => {
+                      setShowAISuggestions(false);
+                      setExpandedSuggestion(null);
+                    }}
                     className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
                   >
                     Close
@@ -715,7 +790,8 @@ const TasksPage: React.FC = () => {
                   <button
                     onClick={() => {
                       setShowAISuggestions(false);
-                      toast.success('AI suggestions applied!');
+                      setExpandedSuggestion(null);
+                      toast.success('AI suggestions noted!');
                     }}
                     className="px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all transform hover:scale-105"
                   >
