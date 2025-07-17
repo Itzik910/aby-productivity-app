@@ -198,6 +198,18 @@ const userSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
   isVerified: { type: Boolean, default: false },
   isAdmin: { type: Boolean, default: false },
+  
+  // User addresses for Fix My Day feature
+  addresses: {
+    home: {
+      type: String,
+      trim: true
+    },
+    work: {
+      type: String,
+      trim: true
+    }
+  },
   verificationToken: String,
   resetPasswordToken: String,
   resetPasswordExpires: Date,

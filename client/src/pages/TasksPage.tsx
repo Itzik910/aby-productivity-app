@@ -27,6 +27,7 @@ import {
 import { useAuthStore } from '../stores/authStore';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
+import { useTaskModalStore } from '../stores/taskModalStore';
 
 interface AISuggestion {
   header: string;
@@ -67,11 +68,12 @@ interface Task {
 
 const TasksPage: React.FC = () => {
   const { user } = useAuthStore();
+  const openTaskModal = useTaskModalStore(state => state.openModal);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -82,21 +84,6 @@ const TasksPage: React.FC = () => {
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
   const [expandedSuggestion, setExpandedSuggestion] = useState<number | null>(null);
   const [generatingAI, setGeneratingAI] = useState(false);
-
-  // New task form state
-  const [newTask, setNewTask] = useState({
-    title: '',
-    description: '',
-    category: 'personal',
-    priority: 'medium',
-    dueDate: '',
-    estimatedDuration: '',
-    tags: [] as string[],
-    location: {
-      name: '',
-      address: ''
-    }
-  });
 
   const categories = [
     { value: 'work', label: 'Work', color: 'bg-blue-500', icon: '💼' },
@@ -183,38 +170,14 @@ const TasksPage: React.FC = () => {
     setFilteredTasks(filtered);
   };
 
-  const createTask = async () => {
-    try {
-      if (!newTask.title.trim()) {
-        toast.error('Please enter a task title');
-        return;
-      }
-
-      const taskData = {
-        ...newTask,
-        estimatedDuration: newTask.estimatedDuration ? parseInt(newTask.estimatedDuration) : undefined,
-        dueDate: newTask.dueDate || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      };
-
-      const response = await api.post('/tasks', taskData);
-      setTasks([response.data, ...tasks]);
-      setNewTask({
-        title: '',
-        description: '',
-        category: 'personal',
-        priority: 'medium',
-        dueDate: '',
-        estimatedDuration: '',
-        tags: [],
-        location: { name: '', address: '' }
-      });
-      setShowCreateModal(false);
-      toast.success('Task created successfully!');
-    } catch (error) {
-      console.error('Error creating task:', error);
-      toast.error('Failed to create task');
-    }
-  };
+  // Refresh tasks when modal creates a new task
+  React.useEffect(() => {
+    const handleTaskCreated = () => {
+      fetchTasks();
+    };
+    window.addEventListener('taskCreated', handleTaskCreated);
+    return () => window.removeEventListener('taskCreated', handleTaskCreated);
+  }, []);
 
   const completeTask = async (taskId: string) => {
     try {
@@ -253,7 +216,7 @@ const TasksPage: React.FC = () => {
       setShowAISuggestions(true);
     } catch (error: any) {
       console.error('Error generating AI suggestions:', error);
-      toast.error(error.response?.data?.message || 'Failed to generate AI suggestions');
+      toast.error(error.response?.data?.message || 'Failed to generate ABY suggestions');
     } finally {
       setGeneratingAI(false);
     }
@@ -312,7 +275,7 @@ const TasksPage: React.FC = () => {
               <span>Filters</span>
             </button>
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => openTaskModal()}
               className="flex items-center space-x-2 px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all transform hover:scale-105"
             >
               <Plus className="w-5 h-5" />
@@ -509,7 +472,7 @@ const TasksPage: React.FC = () => {
                         className="flex items-center space-x-1 px-3 py-1 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors disabled:opacity-50"
                       >
                         <Sparkles className="w-4 h-4" />
-                        <span className="text-sm">AI Help</span>
+                        <span className="text-sm">ABY Help</span>
                       </button>
                     </div>
 
@@ -545,142 +508,17 @@ const TasksPage: React.FC = () => {
                 : 'Create your first task to get started with your productivity journey'
               }
             </p>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all transform hover:scale-105"
-            >
-              Create Your First Task
-            </button>
+                          <button
+                onClick={() => openTaskModal()}
+                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all transform hover:scale-105"
+              >
+                Create Your First Task
+              </button>
           </div>
         )}
       </div>
 
-      {/* Create Task Modal */}
-      <AnimatePresence>
-        {showCreateModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto"
-            >
-              <div className="p-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Create New Task</h2>
-                
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Title *</label>
-                    <input
-                      type="text"
-                      value={newTask.title}
-                      onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                      placeholder="Enter task title..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    />
-                  </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                    <textarea
-                      value={newTask.description}
-                      onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-                      placeholder="Describe your task..."
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                      <select
-                        value={newTask.category}
-                        onChange={(e) => setNewTask({ ...newTask, category: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      >
-                        {categories.map(cat => (
-                          <option key={cat.value} value={cat.value}>{cat.icon} {cat.label}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-                      <select
-                        value={newTask.priority}
-                        onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      >
-                        {priorities.map(priority => (
-                          <option key={priority.value} value={priority.value}>{priority.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Due Date</label>
-                      <input
-                        type="date"
-                        value={newTask.dueDate}
-                        onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Duration (min)</label>
-                      <input
-                        type="number"
-                        value={newTask.estimatedDuration}
-                        onChange={(e) => setNewTask({ ...newTask, estimatedDuration: e.target.value })}
-                        placeholder="60"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
-                    <input
-                      type="text"
-                      value={newTask.location.name}
-                      onChange={(e) => setNewTask({ 
-                        ...newTask, 
-                        location: { ...newTask.location, name: e.target.value }
-                      })}
-                      placeholder="Home, Office, Library..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end space-x-3 mt-6">
-                  <button
-                    onClick={() => setShowCreateModal(false)}
-                    className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={createTask}
-                    className="px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all transform hover:scale-105"
-                  >
-                    Create Task
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* AI Suggestions Modal */}
       <AnimatePresence>
@@ -700,12 +538,12 @@ const TasksPage: React.FC = () => {
               <div className="p-6">
                 <div className="flex items-center space-x-3 mb-6">
                   <Sparkles className="w-6 h-6 text-purple-600" />
-                  <h2 className="text-2xl font-bold text-gray-900">AI Suggestions</h2>
+                  <h2 className="text-2xl font-bold text-gray-900">ABY Suggestions</h2>
                 </div>
                 
                 <div className="mb-4">
                   <h3 className="font-semibold text-gray-900 mb-2">{selectedTask?.title}</h3>
-                  <p className="text-sm text-gray-600">Here are some AI-powered suggestions to help you complete this task:</p>
+                  <p className="text-sm text-gray-600">Here are some ABY-powered suggestions to help you complete this task:</p>
                 </div>
 
                 <div className="space-y-3">

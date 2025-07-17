@@ -11,17 +11,26 @@ import {
   Filter,
   Search
 } from 'lucide-react';
+import { api } from '../services/api';
+import { useTaskModalStore } from '../stores/taskModalStore';
+import toast from 'react-hot-toast';
 
 interface Task {
-  id: string;
+  _id: string;
   title: string;
   description?: string;
-  dueDate: Date;
-  priority: 'low' | 'medium' | 'high';
-  status: 'pending' | 'in-progress' | 'completed';
+  dueDate: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   category: string;
-  location?: string;
-  estimatedTime?: number;
+  location?: {
+    name: string;
+    address: string;
+  };
+  estimatedDuration?: number;
+  progress: {
+    percentage: number;
+  };
 }
 
 const CalendarPage: React.FC = () => {
@@ -29,59 +38,37 @@ const CalendarPage: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [view, setView] = useState<'month' | 'week'>('month');
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPriority, setFilterPriority] = useState<string>('all');
+  const openTaskModal = useTaskModalStore(state => state.openModal);
 
-  // Sample tasks for demonstration
+  // Fetch real tasks from API
   useEffect(() => {
-    const sampleTasks: Task[] = [
-      {
-        id: '1',
-        title: 'Team Meeting',
-        description: 'Weekly team sync meeting',
-        dueDate: new Date(2024, 0, 15, 10, 0),
-        priority: 'high',
-        status: 'pending',
-        category: 'work',
-        location: 'Conference Room A',
-        estimatedTime: 60
-      },
-      {
-        id: '2',
-        title: 'Project Review',
-        description: 'Review quarterly project progress',
-        dueDate: new Date(2024, 0, 16, 14, 0),
-        priority: 'medium',
-        status: 'in-progress',
-        category: 'work',
-        estimatedTime: 90
-      },
-      {
-        id: '3',
-        title: 'Grocery Shopping',
-        description: 'Buy groceries for the week',
-        dueDate: new Date(2024, 0, 17, 16, 0),
-        priority: 'low',
-        status: 'pending',
-        category: 'personal',
-        location: 'Supermarket',
-        estimatedTime: 45
-      },
-      {
-        id: '4',
-        title: 'Workout Session',
-        description: 'Evening workout routine',
-        dueDate: new Date(2024, 0, 18, 18, 0),
-        priority: 'medium',
-        status: 'completed',
-        category: 'health',
-        location: 'Gym',
-        estimatedTime: 60
-      }
-    ];
-    setTasks(sampleTasks);
+    fetchTasks();
   }, []);
+
+  // Refresh tasks when a new task is created
+  useEffect(() => {
+    const handleTaskCreated = () => {
+      fetchTasks();
+    };
+    window.addEventListener('taskCreated', handleTaskCreated);
+    return () => window.removeEventListener('taskCreated', handleTaskCreated);
+  }, []);
+
+  const fetchTasks = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/tasks');
+      setTasks(response.data.tasks);
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+      toast.error('Failed to load tasks');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -127,7 +114,7 @@ const CalendarPage: React.FC = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed': return <CheckCircle className="w-4 h-4 text-green-600" />;
-      case 'in-progress': return <Clock className="w-4 h-4 text-blue-600" />;
+      case 'in_progress': return <Clock className="w-4 h-4 text-blue-600" />;
       case 'pending': return <AlertCircle className="w-4 h-4 text-orange-600" />;
       default: return null;
     }
@@ -166,6 +153,8 @@ const CalendarPage: React.FC = () => {
             isToday ? 'bg-blue-50 border-blue-300' : ''
           } ${isSelected ? 'bg-purple-50 border-purple-300' : ''}`}
           onClick={() => setSelectedDate(date)}
+          onDoubleClick={() => openTaskModal(date)}
+          title="Double-click to add task"
         >
           <div className={`text-sm font-medium ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>
             {day}
@@ -173,7 +162,7 @@ const CalendarPage: React.FC = () => {
           <div className="mt-1 space-y-1">
             {dayTasks.slice(0, 2).map(task => (
               <div
-                key={task.id}
+                key={task._id}
                 className={`text-xs p-1 rounded truncate ${getPriorityColor(task.priority)} text-white`}
               >
                 {task.title}
@@ -272,7 +261,7 @@ const CalendarPage: React.FC = () => {
 
             {/* Add Task Button */}
             <button
-              onClick={() => setShowTaskModal(true)}
+              onClick={() => openTaskModal()}
               className="flex items-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
             >
               <Plus className="w-4 h-4" />
@@ -309,15 +298,15 @@ const CalendarPage: React.FC = () => {
               <div className="space-y-3">
                 {getTasksForDate(new Date()).length > 0 ? (
                   getTasksForDate(new Date()).map(task => (
-                    <div key={task.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                    <div key={task._id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
                       {getStatusIcon(task.status)}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">{task.title}</p>
                         <div className="flex items-center space-x-2 mt-1">
                           <span className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)}`}></span>
                           <span className="text-xs text-gray-500">{task.category}</span>
-                          {task.estimatedTime && (
-                            <span className="text-xs text-gray-500">• {task.estimatedTime}min</span>
+                          {task.estimatedDuration && (
+                            <span className="text-xs text-gray-500">• {task.estimatedDuration}min</span>
                           )}
                         </div>
                       </div>
@@ -343,7 +332,7 @@ const CalendarPage: React.FC = () => {
                 <div className="space-y-3">
                   {getTasksForDate(selectedDate).length > 0 ? (
                     getTasksForDate(selectedDate).map(task => (
-                      <div key={task.id} className="p-3 bg-gray-50 rounded-lg">
+                      <div key={task._id} className="p-3 bg-gray-50 rounded-lg">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <p className="text-sm font-medium text-gray-900">{task.title}</p>
@@ -353,10 +342,10 @@ const CalendarPage: React.FC = () => {
                             <div className="flex items-center space-x-2 mt-2">
                               <span className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)}`}></span>
                               <span className="text-xs text-gray-500">{task.priority} priority</span>
-                              {task.location && (
+                              {task.location?.name && (
                                 <span className="flex items-center text-xs text-gray-500">
                                   <MapPin className="w-3 h-3 mr-1" />
-                                  {task.location}
+                                  {task.location.name}
                                 </span>
                               )}
                             </div>
@@ -366,7 +355,16 @@ const CalendarPage: React.FC = () => {
                       </div>
                     ))
                   ) : (
-                    <p className="text-gray-500 text-sm">No tasks for this date</p>
+                    <div className="text-center">
+                      <p className="text-gray-500 text-sm mb-3">No tasks for this date</p>
+                      <button
+                        onClick={() => openTaskModal(selectedDate)}
+                        className="inline-flex items-center px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors"
+                      >
+                        <Plus className="w-4 h-4 mr-1" />
+                        Add Task
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -389,7 +387,7 @@ const CalendarPage: React.FC = () => {
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">In Progress</span>
                   <span className="text-sm font-medium text-blue-600">
-                    {filteredTasks.filter(t => t.status === 'in-progress').length}
+                    {filteredTasks.filter(t => t.status === 'in_progress').length}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
@@ -404,29 +402,7 @@ const CalendarPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Task Modal Placeholder */}
-      {showTaskModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Task</h3>
-            <p className="text-gray-600 mb-4">Task creation form would go here...</p>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => setShowTaskModal(false)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => setShowTaskModal(false)}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-              >
-                Add Task
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Remove Task Modal since we're using global modal */}
     </div>
   );
 };

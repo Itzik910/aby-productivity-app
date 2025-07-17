@@ -33,6 +33,8 @@ const adminRoutes = require('./routes/admin');
 const premiumRoutes = require('./routes/premium');
 const analyticsRoutes = require('./routes/analytics');
 const notificationRoutes = require('./routes/notifications');
+const userChallengesRoutes = require('./routes/userChallenges');
+const fixMyDayRoutes = require('./routes/fixMyDay');
 
 // Import middleware
 const authMiddleware = require('./middleware/auth');
@@ -126,6 +128,8 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/premium', premiumRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/user-challenges', userChallengesRoutes);
+app.use('/api/fix-my-day', fixMyDayRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

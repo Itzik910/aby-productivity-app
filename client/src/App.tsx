@@ -15,9 +15,14 @@ import CalendarPage from './pages/CalendarPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import AchievementsPage from './pages/AchievementsPage';
 
+// Components
+import DashboardButton from './components/DashboardButton';
+import CreateTaskModal from './components/CreateTaskModal';
+
 // Stores
 import { useAuthStore } from './stores/authStore';
 import { useThemeStore } from './stores/themeStore';
+import { useTaskModalStore } from './stores/taskModalStore';
 
 // Simple loading component
 const LoadingSpinner = ({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) => {
@@ -72,6 +77,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 function App() {
   const { isLoading } = useAuthStore();
   const { theme } = useThemeStore();
+  const { isOpen: isTaskModalOpen, initialDate, closeModal } = useTaskModalStore();
 
   // Apply theme to document
   React.useEffect(() => {
@@ -89,6 +95,12 @@ function App() {
   return (
     <Router>
       <div className="App">
+        <DashboardButton />
+        <CreateTaskModal 
+          isOpen={isTaskModalOpen} 
+          onClose={closeModal}
+          initialDate={initialDate}
+        />
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<WelcomePage />} />

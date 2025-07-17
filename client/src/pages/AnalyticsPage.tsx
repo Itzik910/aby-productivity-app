@@ -13,45 +13,64 @@ import {
   Timer,
   Zap
 } from 'lucide-react';
+import { api } from '../services/api';
+import toast from 'react-hot-toast';
 
 const AnalyticsPage: React.FC = () => {
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'year'>('week');
-  const [analyticsData, setAnalyticsData] = useState({
-    productivity: {
-      daily: 85,
-      weekly: 78,
-      monthly: 82
-    },
-    tasks: {
-      completed: 47,
-      pending: 12,
-      overdue: 3,
-      total: 62
-    },
-    streaks: {
-      current: 7,
-      longest: 15
-    },
-    timeSpent: {
-      today: 6.5,
-      week: 42,
-      month: 168
-    },
-    categories: [
-      { name: 'Work', completed: 25, total: 35, color: 'bg-blue-500' },
-      { name: 'Personal', completed: 15, total: 18, color: 'bg-green-500' },
-      { name: 'Health', completed: 7, total: 9, color: 'bg-purple-500' }
-    ],
-    weeklyProgress: [
-      { day: 'Mon', completed: 8, target: 10 },
-      { day: 'Tue', completed: 12, target: 10 },
-      { day: 'Wed', completed: 6, target: 10 },
-      { day: 'Thu', completed: 9, target: 10 },
-      { day: 'Fri', completed: 7, target: 10 },
-      { day: 'Sat', completed: 3, target: 5 },
-      { day: 'Sun', completed: 2, target: 5 }
-    ]
-  });
+  const [loading, setLoading] = useState(true);
+  const [analyticsData, setAnalyticsData] = useState<any>(null);
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, [timeRange]);
+
+  const fetchAnalytics = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/analytics/dashboard', {
+        params: { timeRange }
+      });
+      
+      // Transform the data to match our component structure
+      const data = response.data.data;
+      setAnalyticsData({
+        productivity: data.productivity,
+        tasks: data.tasks,
+        streaks: data.streaks,
+        timeSpent: data.timeSpent,
+        categories: data.categories.map((cat: any) => ({
+          name: cat.name.charAt(0).toUpperCase() + cat.name.slice(1),
+          completed: cat.completed,
+          total: cat.total,
+          color: getCategoryColor(cat.name)
+        })),
+        weeklyProgress: data.weeklyProgress,
+        insights: data.insights,
+        peakHour: data.peakHour,
+        averageTaskTime: data.averageTaskTime
+      });
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+      toast.error('Failed to load analytics data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getCategoryColor = (category: string) => {
+    const colors: { [key: string]: string } = {
+      work: 'bg-blue-500',
+      personal: 'bg-green-500',
+      health: 'bg-purple-500',
+      learning: 'bg-yellow-500',
+      social: 'bg-pink-500',
+      finance: 'bg-orange-500',
+      home: 'bg-indigo-500',
+      other: 'bg-gray-500'
+    };
+    return colors[category.toLowerCase()] || 'bg-gray-500';
+  };
 
   const StatCard: React.FC<{
     title: string;
@@ -107,6 +126,14 @@ const AnalyticsPage: React.FC = () => {
     const previous = 72; // Mock previous week data
     return current > previous ? 'positive' : current < previous ? 'negative' : 'neutral';
   };
+
+  if (loading || !analyticsData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -188,7 +215,7 @@ const AnalyticsPage: React.FC = () => {
             </div>
             
             <div className="space-y-4">
-              {analyticsData.weeklyProgress.map((day, index) => (
+              {analyticsData.weeklyProgress.map((day: any, index: number) => (
                 <div key={day.day} className="flex items-center space-x-4">
                   <div className="w-12 text-sm font-medium text-gray-600">{day.day}</div>
                   <div className="flex-1 relative">
@@ -213,7 +240,7 @@ const AnalyticsPage: React.FC = () => {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-6">Task Categories</h3>
             <div className="space-y-6">
-              {analyticsData.categories.map((category, index) => (
+              {analyticsData.categories.map((category: any, index: number) => (
                 <div key={category.name}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center space-x-2">
@@ -248,7 +275,10 @@ const AnalyticsPage: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-900">Peak Performance</p>
-                  <p className="text-xs text-gray-600">Tuesday mornings show highest productivity</p>
+                  <p className="text-xs text-gray-600">
+                    Your peak hour is {analyticsData.peakHour}:00 - 
+                    {analyticsData.peakHour + 1}:00
+                  </p>
                 </div>
               </div>
               
@@ -257,8 +287,10 @@ const AnalyticsPage: React.FC = () => {
                   <Clock className="w-4 h-4 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Optimal Focus Time</p>
-                  <p className="text-xs text-gray-600">Average focus session: 45 minutes</p>
+                  <p className="text-sm font-medium text-gray-900">Average Task Time</p>
+                  <p className="text-xs text-gray-600">
+                    {analyticsData.averageTaskTime} minutes per task
+                  </p>
                 </div>
               </div>
               
@@ -267,8 +299,10 @@ const AnalyticsPage: React.FC = () => {
                   <Target className="w-4 h-4 text-purple-600" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Goal Achievement</p>
-                  <p className="text-xs text-gray-600">83% of weekly goals completed</p>
+                  <p className="text-sm font-medium text-gray-900">Completion Rate</p>
+                  <p className="text-xs text-gray-600">
+                    {getCompletionRate()}% of your tasks are completed
+                  </p>
                 </div>
               </div>
             </div>

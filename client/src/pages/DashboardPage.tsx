@@ -17,11 +17,14 @@ import {
   Star,
   BarChart3,
   PieChart,
-  Activity
+  Activity,
+  Navigation
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { api } from '../services/api';
 import { Link } from 'react-router-dom';
+import { useTaskModalStore } from '../stores/taskModalStore';
+import FixMyDayModal from '../components/FixMyDayModal';
 
 interface DashboardStats {
   totalTasks: number;
@@ -63,12 +66,14 @@ const DashboardPage: React.FC = () => {
 
   const { user, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
+  const openTaskModal = useTaskModalStore(state => state.openModal);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentTasks, setRecentTasks] = useState<RecentTask[]>([]);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [motivationalMessage, setMotivationalMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [selectedTimeRange, setSelectedTimeRange] = useState('week');
+  const [showFixMyDay, setShowFixMyDay] = useState(false);
 
   useEffect(() => {
     console.log('[DASHBOARD PAGE] useEffect triggered, isAuthenticated:', isAuthenticated);
@@ -127,13 +132,69 @@ const DashboardPage: React.FC = () => {
 
   const fetchMotivationalMessage = async () => {
     try {
-      const response = await api.post('/ai/motivational-message', {
-        context: { type: 'dashboard', timeRange: selectedTimeRange }
-      });
-      setMotivationalMessage(response.data.message);
+      // Get time-based greeting and emoji
+      const hour = new Date().getHours();
+      let timeEmoji = '🌅';
+      let timeGreeting = 'morning';
+      
+      if (hour >= 5 && hour < 12) {
+        timeEmoji = '🌅';
+        timeGreeting = 'morning';
+      } else if (hour >= 12 && hour < 17) {
+        timeEmoji = '☀️';
+        timeGreeting = 'afternoon';
+      } else if (hour >= 17 && hour < 21) {
+        timeEmoji = '🌆';
+        timeGreeting = 'evening';
+      } else {
+        timeEmoji = '🌙';
+        timeGreeting = 'night';
+      }
+
+      // Calculate productivity level
+      if (stats) {
+        const completionRate = stats.completionRate || 0;
+        let message = '';
+
+                  if (completionRate >= 80) {
+            const messages = [
+              `Outstanding ${timeGreeting}! ${timeEmoji} You're crushing it with ${completionRate}% completion rate! 🚀`,
+              `Incredible ${timeGreeting}! ${timeEmoji} ${completionRate}% tasks completed - you're on fire! 🔥`,
+              `Amazing ${timeGreeting}! ${timeEmoji} Keep this momentum going, productivity champion! 💪`
+            ];
+            message = messages[Math.floor(Math.random() * messages.length)];
+          } else if (completionRate >= 60) {
+            const messages = [
+              `Good ${timeGreeting}! ${timeEmoji} You're at ${completionRate}% - let's push for more! 💫`,
+              `Nice ${timeGreeting}! ${timeEmoji} Solid progress at ${completionRate}% - keep it up! ⭐`,
+              `Great ${timeGreeting}! ${timeEmoji} You're doing well - let's make today count! 🎯`
+            ];
+            message = messages[Math.floor(Math.random() * messages.length)];
+          } else if (completionRate >= 40) {
+            const messages = [
+              `Good ${timeGreeting}! ${timeEmoji} Let's boost that ${completionRate}% completion rate today! 💪`,
+              `Welcome back! ${timeEmoji} Time to turn that ${completionRate}% into success! 🌟`,
+              `Hey there! ${timeEmoji} Every task counts - let's improve from ${completionRate}%! 📈`
+            ];
+            message = messages[Math.floor(Math.random() * messages.length)];
+          } else {
+            const messages = [
+              `Good ${timeGreeting}! ${timeEmoji} Fresh start - let's make today productive! 🌱`,
+              `Welcome! ${timeEmoji} Today is full of possibilities - let's get started! ✨`,
+              `Hey! ${timeEmoji} Small steps lead to big achievements - you've got this! 🎯`
+            ];
+            message = messages[Math.floor(Math.random() * messages.length)];
+          }
+
+        setMotivationalMessage(message);
+      } else {
+        setMotivationalMessage(`Good ${timeGreeting}! ${timeEmoji} Ready to make today amazing? Let's go! 🚀`);
+      }
     } catch (error) {
-      console.error('Error fetching motivational message:', error);
-      setMotivationalMessage("You're doing great! Keep up the excellent work! 🌟");
+      console.error('Error generating motivational message:', error);
+      const hour = new Date().getHours();
+      const timeEmoji = hour < 12 ? '🌅' : hour < 17 ? '☀️' : hour < 21 ? '🌆' : '🌙';
+      setMotivationalMessage(`Welcome back! ${timeEmoji} Let's make today productive! 💪`);
     }
   };
 
@@ -211,13 +272,13 @@ const DashboardPage: React.FC = () => {
                 <option value="year">This Year</option>
               </select>
               
-              <Link
-                to="/tasks"
+              <button
+                onClick={() => openTaskModal()}
                 className="flex items-center space-x-2 px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all transform hover:scale-105"
               >
                 <Plus className="w-5 h-5" />
                 <span>New Task</span>
-              </Link>
+              </button>
             </div>
           </motion.div>
         </div>
@@ -369,13 +430,13 @@ const DashboardPage: React.FC = () => {
               <div className="text-center py-8">
                 <Target className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-500 mb-4">No tasks yet</p>
-                <Link
-                  to="/tasks"
+                <button
+                  onClick={() => openTaskModal()}
                   className="inline-flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Create your first task</span>
-                </Link>
+                </button>
               </div>
             )}
           </motion.div>
@@ -460,9 +521,9 @@ const DashboardPage: React.FC = () => {
               className="flex flex-col items-center space-y-2 p-4 bg-purple-50 rounded-xl hover:bg-purple-100 transition-colors group"
             >
               <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Plus className="w-6 h-6 text-white" />
+                <Target className="w-6 h-6 text-white" />
               </div>
-              <span className="text-sm font-medium text-gray-700">New Task</span>
+              <span className="text-sm font-medium text-gray-700">My Tasks</span>
             </Link>
 
             <Link
@@ -494,8 +555,21 @@ const DashboardPage: React.FC = () => {
               </div>
               <span className="text-sm font-medium text-gray-700">Challenges</span>
             </Link>
+
+            <button
+              onClick={() => setShowFixMyDay(true)}
+              className="flex flex-col items-center space-y-2 p-4 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-colors group"
+            >
+              <div className="w-12 h-12 bg-indigo-600 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Navigation className="w-6 h-6 text-white" />
+              </div>
+              <span className="text-sm font-medium text-gray-700">Fix My Day</span>
+            </button>
           </div>
         </motion.div>
+
+        {/* Fix My Day Modal */}
+        <FixMyDayModal isOpen={showFixMyDay} onClose={() => setShowFixMyDay(false)} />
       </div>
     </div>
   );
