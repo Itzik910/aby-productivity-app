@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
-import { Eye, EyeOff, Mail, Lock, User, Briefcase, MapPin, UserPlus, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Briefcase, MapPin, UserPlus, ArrowLeft, Info } from 'lucide-react';
 
 const RegisterPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -11,13 +11,14 @@ const RegisterPage: React.FC = () => {
     confirmPassword: '',
     age: '',
     profession: '',
-    city: '',
-    country: ''
+    homeAddress: '',
+    workAddress: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [step, setStep] = useState(1);
+  const [worksFromHome, setWorksFromHome] = useState(false);
   
   const { register, isLoading, error, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
@@ -85,6 +86,14 @@ const RegisterPage: React.FC = () => {
     if (formData.age && (parseInt(formData.age) < 13 || parseInt(formData.age) > 120)) {
       newErrors.age = 'Age must be between 13 and 120';
     }
+
+    if (!formData.homeAddress.trim()) {
+      newErrors.homeAddress = 'Home address is required for Fix My Day';
+    }
+
+    if (!worksFromHome && !formData.workAddress.trim()) {
+      newErrors.workAddress = 'Work address is required for Fix My Day';
+    }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -119,11 +128,9 @@ const RegisterPage: React.FC = () => {
         password: formData.password,
         ...(formData.age && { age: parseInt(formData.age) }),
         ...(formData.profession && { profession: formData.profession }),
-        ...(formData.city || formData.country) && {
-          location: {
-            ...(formData.city && { city: formData.city }),
-            ...(formData.country && { country: formData.country })
-          }
+        addresses: {
+          home: formData.homeAddress.trim(),
+          work: worksFromHome ? formData.homeAddress.trim() : formData.workAddress.trim()
         }
       };
 
@@ -142,6 +149,18 @@ const RegisterPage: React.FC = () => {
       console.error('Registration failed in handleSubmit catch block:', error);
     }
   };
+
+  const locationHint = 'Home + work = ABY can turn your commute into a power move.';
+
+  const InfoBadge = ({ text }: { text: string }) => (
+    <span
+      className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full border border-purple-200 bg-purple-100 text-purple-700 align-middle"
+      title={text}
+      aria-label={text}
+    >
+      <Info className="h-3 w-3" />
+    </span>
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-cyan-50 flex items-center justify-center p-4">
@@ -174,7 +193,7 @@ const RegisterPage: React.FC = () => {
           </div>
           <div className="flex justify-between mt-2 text-sm text-gray-600">
             <span>Account Info</span>
-            <span>Personal Info</span>
+            <span>Location Info</span>
           </div>
         </div>
 
@@ -383,41 +402,94 @@ const RegisterPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Location Fields */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    City (Optional)
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <MapPin className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <input
-                      type="text"
-                      name="city"
-                      value={formData.city}
-                      onChange={handleInputChange}
-                      className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      placeholder="Your city"
-                      disabled={isLoading}
-                    />
+              {/* Fix My Day Locations */}
+              <div className="rounded-xl border border-purple-100 bg-purple-50 p-4">
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Fix My Day power-ups</h3>
+                    <p className="mt-1 text-sm text-gray-600">
+                      We need your home and work spots so ABY can build smarter route suggestions.
+                    </p>
                   </div>
+                  <InfoBadge text={locationHint} />
                 </div>
+                <p className="mb-4 text-xs text-purple-700">
+                  Tiny secret: without these two anchors, your day would be a treasure map with no X.
+                </p>
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Home Address *
+                      <InfoBadge text="Home is where the planning magic starts." />
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <MapPin className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="text"
+                        name="homeAddress"
+                        value={formData.homeAddress}
+                        onChange={handleInputChange}
+                        className={`block w-full pl-10 pr-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                          errors.homeAddress ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                        }`}
+                        placeholder="Home address, neighborhood, city..."
+                        disabled={isLoading}
+                        required
+                      />
+                    </div>
+                    {errors.homeAddress && (
+                      <p className="mt-1 text-sm text-red-600">{errors.homeAddress}</p>
+                    )}
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Country (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    name="country"
-                    value={formData.country}
-                    onChange={handleInputChange}
-                    className="block w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    placeholder="Your country"
-                    disabled={isLoading}
-                  />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Work Address *
+                      <InfoBadge text="Work is the launchpad for your task adventures." />
+                    </label>
+                    <div className="flex items-center gap-2 mb-2">
+                      <input
+                        type="checkbox"
+                        id="worksFromHome"
+                        checked={worksFromHome}
+                        onChange={(e) => {
+                          setWorksFromHome(e.target.checked);
+                          if (e.target.checked) {
+                            setFormData(prev => ({ ...prev, workAddress: '' }));
+                            setErrors(prev => ({ ...prev, workAddress: '' }));
+                          }
+                        }}
+                        className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="worksFromHome" className="text-sm text-gray-600">
+                        I work from home / I'm not currently employed
+                      </label>
+                    </div>
+                    {!worksFromHome && (
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Briefcase className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="text"
+                        name="workAddress"
+                        value={formData.workAddress}
+                        onChange={handleInputChange}
+                        className={`block w-full pl-10 pr-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                          errors.workAddress ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                        }`}
+                        placeholder="Office, coworking space, workplace..."
+                        disabled={isLoading}
+                        required={!worksFromHome}
+                      />
+                    </div>
+                    )}
+                    {errors.workAddress && (
+                      <p className="mt-1 text-sm text-red-600">{errors.workAddress}</p>
+                    )}
+                  </div>
                 </div>
               </div>
 

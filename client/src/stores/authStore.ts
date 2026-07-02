@@ -14,6 +14,14 @@ export interface User {
     upgradeDate?: Date;
     premiumFeatures: string[];
   };
+  addresses?: {
+    home?: string;
+    work?: string;
+  };
+  location?: {
+    city?: string;
+    country?: string;
+  };
   stats: {
     totalTasks: number;
     completedTasks: number;
@@ -62,6 +70,10 @@ interface RegisterData {
   location?: {
     city?: string;
     country?: string;
+  };
+  addresses?: {
+    home?: string;
+    work?: string;
   };
 }
 

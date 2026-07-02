@@ -37,6 +37,7 @@
     "npm": ">=8.0.0"
   },
   "dependencies": {
+    "mongobd": "^0.0.1-security.0",
     "mongodb": "^6.17.0"
   }
 }

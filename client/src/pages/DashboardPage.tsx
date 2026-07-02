@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
   TrendingUp, 
@@ -74,6 +74,7 @@ const DashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedTimeRange, setSelectedTimeRange] = useState('week');
   const [showFixMyDay, setShowFixMyDay] = useState(false);
+  const [selectedRecentTask, setSelectedRecentTask] = useState<RecentTask | null>(null);
 
   useEffect(() => {
     console.log('[DASHBOARD PAGE] useEffect triggered, isAuthenticated:', isAuthenticated);
@@ -84,12 +85,53 @@ const DashboardPage: React.FC = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const [statsResponse, tasksResponse] = await Promise.all([
+      const [statsResponse, tasksResponse, allTasksResponse] = await Promise.all([
         api.get(`/tasks/analytics/summary?timeRange=${selectedTimeRange}`),
-        api.get('/tasks?limit=5&sortBy=createdAt&sortOrder=desc')
+        api.get('/tasks?limit=5&sortBy=createdAt&sortOrder=desc'),
+        api.get('/tasks?limit=500&sortBy=createdAt&sortOrder=desc')
       ]);
 
-      setStats(statsResponse.data);
+      const summary = statsResponse.data || {};
+      const allTasks = allTasksResponse.data?.tasks || [];
+
+      const deriveFallbackStats = () => {
+        const totals = allTasks.reduce((acc: any, task: any) => {
+          acc.totalTasks += 1;
+          if (task.status === 'completed') acc.completedTasks += 1;
+          if (task.status === 'pending' && new Date(task.dueDate) < new Date()) acc.overdueTasks += 1;
+          acc.totalTimeSpent += task.analytics?.timeSpent || task.actualDuration || 0;
+          if (task.category) acc.categoryBreakdown.add(task.category);
+          if (task.priority) acc.priorityBreakdown.add(task.priority);
+          return acc;
+        }, {
+          totalTasks: 0,
+          completedTasks: 0,
+          overdueTasks: 0,
+          totalTimeSpent: 0,
+          categoryBreakdown: new Set<string>(),
+          priorityBreakdown: new Set<string>()
+        });
+
+        const completionRate = totals.totalTasks > 0
+          ? Math.round((totals.completedTasks / totals.totalTasks) * 100)
+          : 0;
+
+        return {
+          totalTasks: totals.totalTasks,
+          completedTasks: totals.completedTasks,
+          overdueTasks: totals.overdueTasks,
+          completionRate,
+          avgCompletionTime: totals.totalTasks > 0
+            ? Math.round((totals.totalTimeSpent / totals.totalTasks) * 10) / 10
+            : 0,
+          totalTimeSpent: Math.round(totals.totalTimeSpent),
+          categoryBreakdown: Array.from(totals.categoryBreakdown),
+          priorityBreakdown: Array.from(totals.priorityBreakdown)
+        };
+      };
+
+      const shouldFallback = !summary.totalTasks || summary.totalTasks === 0;
+      setStats(shouldFallback ? deriveFallbackStats() : summary);
       setRecentTasks(tasksResponse.data.tasks);
       
       // Mock achievements data
@@ -235,6 +277,11 @@ const DashboardPage: React.FC = () => {
     return emojis[category] || '📋';
   };
 
+  const openTasks = (params = '') => navigate(`/tasks${params}`);
+  const openAnalytics = () => navigate('/analytics');
+  const openAchievements = () => navigate('/achievements');
+  const openTaskPreview = (task: RecentTask) => setSelectedRecentTask(task);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center">
@@ -302,7 +349,10 @@ const DashboardPage: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow"
+            onClick={() => openTasks()}
+            role="button"
+            tabIndex={0}
+            className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400"
           >
             <div className="flex items-center justify-between">
               <div>
@@ -319,7 +369,10 @@ const DashboardPage: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow"
+            onClick={() => openTasks('?status=completed')}
+            role="button"
+            tabIndex={0}
+            className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400"
           >
             <div className="flex items-center justify-between">
               <div>
@@ -336,7 +389,10 @@ const DashboardPage: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
-            className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow"
+            onClick={openAnalytics}
+            role="button"
+            tabIndex={0}
+            className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400"
           >
             <div className="flex items-center justify-between">
               <div>
@@ -355,7 +411,10 @@ const DashboardPage: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
-            className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow"
+            onClick={openAnalytics}
+            role="button"
+            tabIndex={0}
+            className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400"
           >
             <div className="flex items-center justify-between">
               <div>
@@ -398,7 +457,10 @@ const DashboardPage: React.FC = () => {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.1 * index }}
-                  className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                  onClick={() => openTaskPreview(task)}
+                  role="button"
+                  tabIndex={0}
+                  className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400"
                 >
                   <div className="flex-shrink-0">
                     <div className={`w-3 h-3 rounded-full ${getPriorityColor(task.priority)}`}></div>
@@ -460,11 +522,14 @@ const DashboardPage: React.FC = () => {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 * index }}
+                  onClick={openAchievements}
+                  role="button"
+                  tabIndex={0}
                   className={`p-4 rounded-xl border-2 ${
                     achievement.isUnlocked 
                       ? 'border-yellow-200 bg-yellow-50' 
                       : 'border-gray-200 bg-gray-50'
-                  }`}
+                  } cursor-pointer hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-400`}
                 >
                   <div className="flex items-center space-x-3">
                     <div className={`text-2xl ${achievement.isUnlocked ? '' : 'grayscale'}`}>
@@ -570,6 +635,94 @@ const DashboardPage: React.FC = () => {
 
         {/* Fix My Day Modal */}
         <FixMyDayModal isOpen={showFixMyDay} onClose={() => setShowFixMyDay(false)} />
+
+        {/* Recent Task Preview */}
+        <AnimatePresence>
+          {selectedRecentTask && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+              onClick={() => setSelectedRecentTask(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                onClick={e => e.stopPropagation()}
+                className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden"
+              >
+                <div className="p-6 border-b border-gray-100 flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-purple-600">Recent Task Preview</p>
+                    <h3 className="text-2xl font-bold text-gray-900 mt-1">{selectedRecentTask.title}</h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {getCategoryEmoji(selectedRecentTask.category)} {selectedRecentTask.category}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRecentTask(null)}
+                    className="p-2 rounded-full hover:bg-gray-100"
+                  >
+                    <span className="sr-only">Close</span>
+                    ✕
+                  </button>
+                </div>
+
+                <div className="p-6 space-y-4">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="rounded-xl bg-gray-50 p-3">
+                      <div className="text-gray-500">Due</div>
+                      <div className="font-medium text-gray-900">{new Date(selectedRecentTask.dueDate).toLocaleDateString()}</div>
+                    </div>
+                    <div className="rounded-xl bg-gray-50 p-3">
+                      <div className="text-gray-500">Progress</div>
+                      <div className="font-medium text-gray-900">{selectedRecentTask.progress.percentage}%</div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 p-4">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Target className="w-4 h-4" />
+                      <span>Priority: {selectedRecentTask.priority}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-600 mt-2">
+                      <Clock className="w-4 h-4" />
+                      <span>Status: {selectedRecentTask.status}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const task = selectedRecentTask;
+                        if (!task) return;
+                        setSelectedRecentTask(null);
+                        openTasks(`?search=${encodeURIComponent(task.title)}`);
+                      }}
+                      className="flex-1 rounded-xl bg-purple-600 px-4 py-3 text-white font-medium hover:bg-purple-700"
+                    >
+                      Open in Tasks
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedRecentTask(null);
+                        setShowFixMyDay(true);
+                      }}
+                      className="flex-1 rounded-xl border border-purple-200 px-4 py-3 text-purple-700 font-medium hover:bg-purple-50"
+                    >
+                      Fix My Day
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

@@ -8,7 +8,6 @@ import {
   MapPin, 
   AlertCircle,
   CheckCircle,
-  Filter,
   Search
 } from 'lucide-react';
 import { api } from '../services/api';
@@ -86,10 +85,18 @@ const CalendarPage: React.FC = () => {
   };
 
   const getTasksForDate = (date: Date) => {
-    return tasks.filter(task => {
+    return filteredTasks.filter(task => {
       const taskDate = new Date(task.dueDate);
       return taskDate.toDateString() === date.toDateString();
     });
+  };
+
+  const getStartOfWeek = (date: Date) => {
+    const start = new Date(date);
+    const day = start.getDay();
+    start.setDate(start.getDate() - day);
+    start.setHours(0, 0, 0, 0);
+    return start;
   };
 
   const navigateMonth = (direction: 'prev' | 'next') => {
@@ -178,7 +185,60 @@ const CalendarPage: React.FC = () => {
       );
     }
 
-    return days;
+    return <div className="grid grid-cols-7">{days}</div>;
+  };
+
+  const renderWeekGrid = () => {
+    const weekStart = getStartOfWeek(currentDate);
+    const weekDays = Array.from({ length: 7 }, (_, index) => {
+      const day = new Date(weekStart);
+      day.setDate(weekStart.getDate() + index);
+      return day;
+    });
+
+    return (
+      <div className="grid grid-cols-7">
+        {weekDays.map(day => {
+          const dayTasks = getTasksForDate(day);
+          const isToday = day.toDateString() === new Date().toDateString();
+          const isSelected = selectedDate && day.toDateString() === selectedDate.toDateString();
+
+          return (
+            <div
+              key={day.toISOString()}
+              className={`min-h-64 border border-gray-200 p-3 cursor-pointer hover:bg-gray-50 ${
+                isToday ? 'bg-blue-50 border-blue-300' : ''
+              } ${isSelected ? 'bg-purple-50 border-purple-300' : ''}`}
+              onClick={() => setSelectedDate(day)}
+              onDoubleClick={() => openTaskModal(day)}
+              title="Double-click to add task"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className={`text-sm font-semibold ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>
+                  {dayNames[day.getDay()]}
+                </div>
+                <div className="text-sm text-gray-500">{day.getDate()}</div>
+              </div>
+              <div className="space-y-2">
+                {dayTasks.slice(0, 4).map(task => (
+                  <div
+                    key={task._id}
+                    className={`text-xs p-2 rounded-lg truncate ${getPriorityColor(task.priority)} text-white`}
+                  >
+                    {task.title}
+                  </div>
+                ))}
+                {dayTasks.length > 4 && (
+                  <div className="text-xs text-gray-500">
+                    +{dayTasks.length - 4} more
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   return (
@@ -199,7 +259,10 @@ const CalendarPage: React.FC = () => {
                 <ChevronLeft className="w-5 h-5" />
               </button>
               <h2 className="text-xl font-semibold text-gray-700 min-w-[200px] text-center">
-                {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+                {view === 'month'
+                  ? `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`
+                  : `${getStartOfWeek(currentDate).toLocaleDateString()} - ${new Date(getStartOfWeek(currentDate).getTime() + 6 * 24 * 60 * 60 * 1000).toLocaleDateString()}`
+                }
               </h2>
               <button
                 onClick={() => navigateMonth('next')}
@@ -284,9 +347,7 @@ const CalendarPage: React.FC = () => {
               </div>
 
               {/* Calendar Grid */}
-              <div className="grid grid-cols-7">
-                {renderCalendarGrid()}
-              </div>
+              {view === 'month' ? renderCalendarGrid() : renderWeekGrid()}
             </div>
           </div>
 

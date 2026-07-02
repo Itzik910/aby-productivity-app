@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
 import { 
   Plus, 
   Filter, 
@@ -7,13 +8,10 @@ import {
   Calendar, 
   MapPin, 
   Clock, 
-  Star, 
   CheckCircle,
-  Circle,
   MoreVertical,
   Edit,
   Trash2,
-  Zap,
   Target,
   AlertCircle,
   Sparkles,
@@ -24,7 +22,6 @@ import {
   Home,
   Wrench
 } from 'lucide-react';
-import { useAuthStore } from '../stores/authStore';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
 import { useTaskModalStore } from '../stores/taskModalStore';
@@ -34,6 +31,23 @@ interface AISuggestion {
   details: string;
   type: 'location' | 'diy' | 'service' | 'timing' | 'collaboration';
   actionable: boolean;
+}
+
+interface FiveWay {
+  wayId: number;
+  wayTitle: string;
+  type: string;
+  estimatedMinutes: number;
+  estimatedCostRange?: string;
+  steps: string[];
+  recommendedPlaces?: Array<{
+    name: string;
+    address: string;
+    rating?: number | null;
+    costText?: string;
+    placeId?: string;
+    mapsUrl?: string;
+  }>;
 }
 
 interface Task {
@@ -66,14 +80,41 @@ interface Task {
   }>;
 }
 
+interface TaskEditForm {
+  title: string;
+  description: string;
+  category: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  dueDate: string;
+  estimatedDuration: string;
+  location: {
+    name: string;
+    address: string;
+  };
+}
+
 const TasksPage: React.FC = () => {
-  const { user } = useAuthStore();
+  const FIVE_WAYS_TIMEOUT_MS = 60000;
+  const location = useLocation();
   const openTaskModal = useTaskModalStore(state => state.openModal);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const [showTaskMenuId, setShowTaskMenuId] = useState<string | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<TaskEditForm>({
+    title: '',
+    description: '',
+    category: 'personal',
+    priority: 'medium',
+    dueDate: '',
+    estimatedDuration: '',
+    location: {
+      name: '',
+      address: ''
+    }
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -84,6 +125,10 @@ const TasksPage: React.FC = () => {
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
   const [expandedSuggestion, setExpandedSuggestion] = useState<number | null>(null);
   const [generatingAI, setGeneratingAI] = useState(false);
+  const [showFiveWays, setShowFiveWays] = useState(false);
+  const [fiveWays, setFiveWays] = useState<FiveWay[]>([]);
+  const [selectedWay, setSelectedWay] = useState<FiveWay | null>(null);
+  const [loadingFiveWays, setLoadingFiveWays] = useState(false);
 
   const categories = [
     { value: 'work', label: 'Work', color: 'bg-blue-500', icon: '💼' },
@@ -106,6 +151,23 @@ const TasksPage: React.FC = () => {
   useEffect(() => {
     fetchTasks();
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const search = params.get('search');
+    const status = params.get('status');
+    const category = params.get('category');
+
+    if (search !== null) {
+      setSearchQuery(search);
+    }
+    if (status) {
+      setFilterStatus(status);
+    }
+    if (category) {
+      setFilterCategory(category);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     filterTasks();
@@ -220,6 +282,85 @@ const TasksPage: React.FC = () => {
     } finally {
       setGeneratingAI(false);
     }
+  };
+
+  const generateFiveWays = async (task: Task) => {
+    try {
+      setLoadingFiveWays(true);
+      setSelectedTask(task);
+      setSelectedWay(null);
+      setFiveWays([]);
+      setShowFiveWays(true);
+      const response = await api.get(`/tasks/${task._id}/five-ways`, {
+        timeout: FIVE_WAYS_TIMEOUT_MS,
+      });
+      setFiveWays(response.data.ways || []);
+    } catch (error: any) {
+      console.error('Error generating five ways:', error);
+      if (error.code === 'ECONNABORTED') {
+        toast.error('ABY Help is taking longer than usual. Try again in a moment.');
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to generate ways');
+      }
+      setShowFiveWays(false);
+    } finally {
+      setLoadingFiveWays(false);
+    }
+  };
+
+  const openEditTask = (task: Task) => {
+    setEditingTaskId(task._id);
+    setEditForm({
+      title: task.title,
+      description: task.description || '',
+      category: task.category,
+      priority: task.priority,
+      dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
+      estimatedDuration: task.estimatedDuration ? String(task.estimatedDuration) : '',
+      location: {
+        name: task.location?.name || '',
+        address: task.location?.address || ''
+      }
+    });
+    setShowTaskMenuId(null);
+  };
+
+  const saveEditedTask = async () => {
+    if (!editingTaskId) return;
+
+    try {
+      if (!editForm.title.trim()) {
+        toast.error('Please enter a task title');
+        return;
+      }
+
+      const payload = {
+        title: editForm.title.trim(),
+        description: editForm.description.trim(),
+        category: editForm.category,
+        priority: editForm.priority,
+        dueDate: editForm.dueDate,
+        estimatedDuration: editForm.estimatedDuration ? parseInt(editForm.estimatedDuration) : undefined,
+        location: editForm.location.name.trim()
+          ? {
+              name: editForm.location.name.trim(),
+              address: editForm.location.address.trim()
+            }
+          : undefined
+      };
+
+      const response = await api.put(`/tasks/${editingTaskId}`, payload);
+      setTasks(tasks.map(task => (task._id === editingTaskId ? response.data : task)));
+      toast.success('Task updated');
+      setEditingTaskId(null);
+    } catch (error) {
+      console.error('Error updating task:', error);
+      toast.error('Failed to update task');
+    }
+  };
+
+  const closeEditModal = () => {
+    setEditingTaskId(null);
   };
 
   const getCategoryInfo = (category: string) => {
@@ -396,9 +537,47 @@ const TasksPage: React.FC = () => {
                         {priorityInfo.label}
                       </span>
                       <div className="relative">
-                        <button className="p-1 hover:bg-gray-100 rounded-full">
+                        <button
+                          type="button"
+                          onClick={() => setShowTaskMenuId(showTaskMenuId === task._id ? null : task._id)}
+                          className="p-1 hover:bg-gray-100 rounded-full"
+                        >
                           <MoreVertical className="w-4 h-4 text-gray-500" />
                         </button>
+                        {showTaskMenuId === task._id && (
+                          <div className="absolute right-0 top-8 z-20 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => openEditTask(task)}
+                              className="flex w-full items-center px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                            >
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                completeTask(task._id);
+                                setShowTaskMenuId(null);
+                              }}
+                              className="flex w-full items-center px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                            >
+                              <CheckCircle className="w-4 h-4 mr-2" />
+                              Complete
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                deleteTask(task._id);
+                                setShowTaskMenuId(null);
+                              }}
+                              className="flex w-full items-center px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -467,8 +646,8 @@ const TasksPage: React.FC = () => {
                       )}
                       
                       <button
-                        onClick={() => generateAISuggestions(task)}
-                        disabled={generatingAI}
+                        onClick={() => generateFiveWays(task)}
+                        disabled={loadingFiveWays}
                         className="flex items-center space-x-1 px-3 py-1 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors disabled:opacity-50"
                       >
                         <Sparkles className="w-4 h-4" />
@@ -478,7 +657,7 @@ const TasksPage: React.FC = () => {
 
                     <div className="flex items-center space-x-1">
                       <button
-                        onClick={() => setSelectedTask(task)}
+                        onClick={() => openEditTask(task)}
                         className="p-1 hover:bg-gray-100 rounded-full"
                       >
                         <Edit className="w-4 h-4 text-gray-500" />
@@ -519,6 +698,146 @@ const TasksPage: React.FC = () => {
       </div>
 
 
+
+      {/* Edit Task Modal */}
+      <AnimatePresence>
+        {editingTaskId && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            onClick={closeEditModal}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-gray-900">Edit Task</h2>
+                  <button onClick={closeEditModal} className="p-2 hover:bg-gray-100 rounded-full">
+                    <Edit className="w-5 h-5 text-gray-500" />
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                  <input
+                    type="text"
+                    value={editForm.title}
+                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                  <textarea
+                    value={editForm.description}
+                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                    <select
+                      value={editForm.category}
+                      onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    >
+                      {categories.map(cat => (
+                        <option key={cat.value} value={cat.value}>{cat.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                    <select
+                      value={editForm.priority}
+                      onChange={(e) => setEditForm({ ...editForm, priority: e.target.value as TaskEditForm['priority'] })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    >
+                      {priorities.map(priority => (
+                        <option key={priority.value} value={priority.value}>{priority.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Due Date</label>
+                    <input
+                      type="date"
+                      value={editForm.dueDate}
+                      onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Duration (min)</label>
+                    <input
+                      type="number"
+                      value={editForm.estimatedDuration}
+                      onChange={(e) => setEditForm({ ...editForm, estimatedDuration: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Location Name</label>
+                    <input
+                      type="text"
+                      value={editForm.location.name}
+                      onChange={(e) => setEditForm({
+                        ...editForm,
+                        location: { ...editForm.location, name: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Location Address</label>
+                    <input
+                      type="text"
+                      value={editForm.location.address}
+                      onChange={(e) => setEditForm({
+                        ...editForm,
+                        location: { ...editForm.location, address: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-2">
+                  <button
+                    onClick={closeEditModal}
+                    className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveEditedTask}
+                    className="px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* AI Suggestions Modal */}
       <AnimatePresence>
@@ -641,8 +960,162 @@ const TasksPage: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Five Ways Modal */}
+      <AnimatePresence>
+        {showFiveWays && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+            >
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2">
+                    <Sparkles className="w-6 h-6 text-purple-600" />
+                    <h2 className="text-xl font-bold text-gray-900">
+                      {selectedWay ? selectedWay.wayTitle : 'ABY Help'}
+                    </h2>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (selectedWay) {
+                        setSelectedWay(null);
+                      } else {
+                        setShowFiveWays(false);
+                      }
+                    }}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500"
+                  >
+                    {selectedWay ? '← Back' : '✕'}
+                  </button>
+                </div>
+
+                {!selectedWay && (
+                  <p className="text-sm text-gray-500 mb-4">
+                    {selectedTask?.title} — choose a way to complete it
+                  </p>
+                )}
+
+                {loadingFiveWays ? (
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600 mx-auto mb-3"></div>
+                    <p className="text-gray-500 text-sm">ABY is thinking...</p>
+                  </div>
+                ) : selectedWay ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-700 capitalize">
+                        {selectedWay.type.replace(/_/g, ' ')}
+                      </span>
+                      <span className="text-xs text-gray-500">~{selectedWay.estimatedMinutes} min</span>
+                      {selectedWay.estimatedCostRange && (
+                        <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">
+                          {selectedWay.estimatedCostRange}
+                        </span>
+                      )}
+                    </div>
+                    <ol className="space-y-3">
+                      {selectedWay.steps.map((step, i) => (
+                        <li key={i} className="flex items-start gap-3">
+                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-purple-600 text-white text-xs flex items-center justify-center font-semibold">
+                            {i + 1}
+                          </span>
+                          <span className="text-sm text-gray-700 leading-relaxed">{step}</span>
+                        </li>
+                      ))}
+                    </ol>
+
+                    {selectedWay.recommendedPlaces && selectedWay.recommendedPlaces.length > 0 && (
+                      <div className="pt-2">
+                        <h4 className="text-sm font-semibold text-gray-900 mb-2">Suggested places</h4>
+                        <div className="space-y-2">
+                          {selectedWay.recommendedPlaces.map(place => (
+                            <a
+                              key={`${place.placeId || place.name}-${place.address}`}
+                              href={place.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)} ${encodeURIComponent(place.address)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block rounded-lg border border-gray-200 p-3 hover:border-purple-300 hover:bg-purple-50 transition-colors"
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <div>
+                                  <div className="text-sm font-medium text-gray-900">{place.name}</div>
+                                  <div className="text-xs text-gray-500">{place.address}</div>
+                                </div>
+                                <div className="flex flex-col items-end gap-1">
+                                  {place.rating ? (
+                                    <span className="text-xs px-2 py-1 rounded-full bg-yellow-50 text-yellow-700">
+                                      {place.rating.toFixed(1)}★
+                                    </span>
+                                  ) : null}
+                                  {place.costText ? (
+                                    <span className="text-xs px-2 py-1 rounded-full bg-green-50 text-green-700">
+                                      {place.costText}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {fiveWays.map(way => (
+                      <button
+                        key={way.wayId}
+                        type="button"
+                        onClick={() => setSelectedWay(way)}
+                        className="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-purple-400 hover:bg-purple-50 transition-all group"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-semibold text-gray-900 group-hover:text-purple-700 text-sm">
+                              {way.wayTitle}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-0.5 capitalize">
+                              {way.type.replace(/_/g, ' ')} · ~{way.estimatedMinutes} min
+                            </div>
+                            {way.estimatedCostRange && (
+                              <div className="text-xs text-green-600 mt-1">
+                                Cost: {way.estimatedCostRange}
+                              </div>
+                            )}
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-purple-500" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {!loadingFiveWays && !selectedWay && (
+                  <div className="flex justify-end mt-6">
+                    <button
+                      onClick={() => setShowFiveWays(false)}
+                      className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors text-sm"
+                    >
+                      Close
+                    </button>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
 
-export default TasksPage; 
+export default TasksPage;

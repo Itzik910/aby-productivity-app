@@ -281,7 +281,7 @@ const userSchema = new mongoose.Schema({
 });
 
 // Indexes for performance
-userSchema.index({ email: 1 });
+// Removed duplicate email index - unique: true already creates one
 userSchema.index({ 'premium.isPremium': 1 });
 userSchema.index({ isActive: 1 });
 userSchema.index({ lastLoginAt: 1 });

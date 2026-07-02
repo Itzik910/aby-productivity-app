@@ -1,0 +1,15 @@
+---
+description: Keep a running summary of the conversation and solution
+alwaysApply: true
+---
+
+# Session Summary
+
+After completing each user request, append a short entry to `.cursor/session-summary.md`.
+
+Include:
+- what the user asked for
+- what was answered, changed, or decided
+- important files, commands, or follow-up actions
+
+Keep entries brief, factual, and append-only so the file can serve as a lightweight conversation memory when context is trimmed.

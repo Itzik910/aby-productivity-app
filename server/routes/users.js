@@ -27,7 +27,7 @@ router.get('/profile', authenticateToken, async function(req, res) {
 // @access  Private
 router.put('/profile', authenticateToken, async function(req, res) {
   try {
-    const { name, profession, location, preferences } = req.body;
+    const { name, profession, location, addresses, preferences } = req.body;
     
     const user = await User.findById(req.user.id);
     if (!user) {
@@ -41,6 +41,7 @@ router.put('/profile', authenticateToken, async function(req, res) {
     if (name) user.name = name;
     if (profession) user.profession = profession;
     if (location) user.location = location;
+    if (addresses) user.addresses = addresses;
     if (preferences) user.preferences = { ...user.preferences, ...preferences };
 
     await user.save();

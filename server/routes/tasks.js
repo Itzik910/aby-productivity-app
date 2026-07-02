@@ -521,4 +521,22 @@ router.post('/bulk/complete', auth, async (req, res) => {
   }
 });
 
-module.exports = router; 
+// @route   GET /tasks/:id/five-ways
+// @desc    Generate 5 ways to complete a task with step-by-step instructions
+// @access  Private
+router.get('/:id/five-ways', auth, async (req, res) => {
+  try {
+    const task = await Task.findOne({ _id: req.params.id, user: req.user.id });
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    const user = await User.findById(req.user.id);
+    const ways = await aiService.generateFiveWays(task, user);
+
+    res.json({ success: true, ways });
+  } catch (error) {
+    console.error('Error generating five ways:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+module.exports = router;

@@ -8,6 +8,7 @@ import PremiumUpgradePage from './pages/PremiumUpgradePage';
 import TasksPage from './pages/TasksPage';
 import DashboardPage from './pages/DashboardPage';
 import ChallengesPage from './pages/ChallengesPage';
+import UserChallengesPage from './pages/UserChallengesPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
@@ -114,6 +115,7 @@ function App() {
           <Route path="/tasks" element={<ProtectedRoute><TasksPage /></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="/challenges" element={<ProtectedRoute><ChallengesPage /></ProtectedRoute>} />
+          <Route path="/my-challenges" element={<ProtectedRoute><UserChallengesPage /></ProtectedRoute>} />
           <Route path="/premium" element={<ProtectedRoute><PremiumUpgradePage /></ProtectedRoute>} />
           
           {/* Other routes */}

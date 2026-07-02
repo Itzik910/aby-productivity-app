@@ -73,7 +73,7 @@ router.post('/register', registerValidation, async (req, res) => {
       });
     }
 
-    const { name, email, password, age, profession, location } = req.body;
+    const { name, email, password, age, profession, location, addresses } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -95,6 +95,7 @@ router.post('/register', registerValidation, async (req, res) => {
       age,
       profession,
       location,
+      addresses,
       verificationToken,
       isVerified: false
     });
@@ -125,6 +126,8 @@ router.post('/register', registerValidation, async (req, res) => {
           name: user.name,
           email: user.email,
           profession: user.profession,
+          addresses: user.addresses,
+          location: user.location,
           isVerified: user.isVerified,
           premium: user.premium
         },
@@ -223,6 +226,8 @@ router.post('/login', loginValidation, async (req, res) => {
           email: user.email,
           avatar: user.avatar,
           profession: user.profession,
+          addresses: user.addresses,
+          location: user.location,
           isVerified: user.isVerified,
           premium: user.premium,
           stats: user.stats,

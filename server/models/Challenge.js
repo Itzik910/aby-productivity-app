@@ -329,7 +329,6 @@ const challengeSchema = new mongoose.Schema({
     keywords: [String],
     slug: {
       type: String,
-      unique: true,
       sparse: true
     }
   },
