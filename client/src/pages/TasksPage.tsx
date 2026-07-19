@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
+import TaskChecklist from '../components/TaskChecklist';
+import TaskShareModal from '../components/TaskShareModal';
+import PomodoroTimer from '../components/PomodoroTimer';
 import { 
   Plus, 
   Filter, 
@@ -75,8 +78,11 @@ interface Task {
   };
   tags: string[];
   steps: Array<{
+    _id?: string;
     title: string;
     isCompleted: boolean;
+    completedAt?: string;
+    order: number;
   }>;
 }
 
@@ -129,6 +135,8 @@ const TasksPage: React.FC = () => {
   const [fiveWays, setFiveWays] = useState<FiveWay[]>([]);
   const [selectedWay, setSelectedWay] = useState<FiveWay | null>(null);
   const [loadingFiveWays, setLoadingFiveWays] = useState(false);
+  const [sharingTask, setSharingTask] = useState<Task | null>(null);
+  const [focusTask, setFocusTask] = useState<Task | null>(null);
 
   const categories = [
     { value: 'work', label: 'Work', color: 'bg-blue-500', icon: '💼' },
@@ -399,7 +407,7 @@ const TasksPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 pt-12">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
@@ -545,7 +553,7 @@ const TasksPage: React.FC = () => {
                           <MoreVertical className="w-4 h-4 text-gray-500" />
                         </button>
                         {showTaskMenuId === task._id && (
-                          <div className="absolute right-0 top-8 z-20 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
+                          <div className="absolute right-0 top-8 z-20 w-44 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
                             <button
                               type="button"
                               onClick={() => openEditTask(task)}
@@ -553,6 +561,17 @@ const TasksPage: React.FC = () => {
                             >
                               <Edit className="w-4 h-4 mr-2" />
                               Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSharingTask(task);
+                                setShowTaskMenuId(null);
+                              }}
+                              className="flex w-full items-center px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                            >
+                              <Users className="w-4 h-4 mr-2" />
+                              Share
                             </button>
                             <button
                               type="button"
@@ -630,6 +649,21 @@ const TasksPage: React.FC = () => {
                         ))}
                       </div>
                     )}
+
+                    {/* Checklist */}
+                    <div className="border-t border-gray-100 pt-3 mt-3">
+                      <TaskChecklist
+                        taskId={task._id}
+                        steps={task.steps || []}
+                        onUpdate={(steps, progress) => {
+                          setTasks((prev) =>
+                            prev.map((t) =>
+                              t._id === task._id ? { ...t, steps, progress } : t
+                            )
+                          );
+                        }}
+                      />
+                    </div>
                   </div>
 
                   {/* Actions */}
@@ -653,7 +687,32 @@ const TasksPage: React.FC = () => {
                         <Sparkles className="w-4 h-4" />
                         <span className="text-sm">ABY Help</span>
                       </button>
-                    </div>
+                      <button
+                        onClick={async () => {
+                          try {
+                            const res = await api.post(`/tasks/${task._id}/breakdown`);
+                            setTasks((prev) =>
+                              prev.map((t) => t._id === task._id ? { ...t, steps: res.data.steps, progress: res.data.progress } : t)
+                            );
+                            toast.success('Task broken down into steps!');
+                          } catch {
+                            toast.error('Failed to break down task');
+                          }
+                        }}
+                        className="flex items-center space-x-1 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors text-sm"
+                        title="AI: Break into steps"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span>Split</span>
+                      </button>
+                      <button
+                        onClick={() => setFocusTask(task)}
+                        className="flex items-center space-x-1 px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors text-sm"
+                        title="Start Pomodoro focus session"
+                      >
+                        <Clock className="w-3 h-3" />
+                        <span>Focus</span>
+                      </button>                    </div>
 
                     <div className="flex items-center space-x-1">
                       <button
@@ -1114,6 +1173,30 @@ const TasksPage: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Task Share Modal */}
+      {sharingTask && (
+        <TaskShareModal
+          taskId={sharingTask._id}
+          taskTitle={sharingTask.title}
+          collaborators={(sharingTask as any).collaborators || []}
+          isOpen={!!sharingTask}
+          onClose={() => setSharingTask(null)}
+          onUpdate={(collaborators) => {
+            setTasks((prev) =>
+              prev.map((t) => t._id === sharingTask._id ? { ...t, collaborators } as any : t)
+            );
+          }}
+        />
+      )}
+
+      {/* Pomodoro Focus Timer */}
+      <PomodoroTimer
+        isOpen={!!focusTask}
+        taskId={focusTask?._id}
+        taskTitle={focusTask?.title}
+        onClose={() => setFocusTask(null)}
+      />
     </div>
   );
 };

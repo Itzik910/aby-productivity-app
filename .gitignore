@@ -1,3 +1,8 @@
+# AI backend virtual environment
+ai_backend/venv/
+ai_backend/__pycache__/
+ai_backend/*.pyc
+
 # Dependencies
 node_modules/
 npm-debug.log*

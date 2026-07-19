@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { 
   TrendingUp, 
   Calendar, 
@@ -25,6 +26,7 @@ import { api } from '../services/api';
 import { Link } from 'react-router-dom';
 import { useTaskModalStore } from '../stores/taskModalStore';
 import FixMyDayModal from '../components/FixMyDayModal';
+import PlanMyDay from '../components/PlanMyDay';
 
 interface DashboardStats {
   totalTasks: number;
@@ -58,11 +60,7 @@ interface Achievement {
 }
 
 const DashboardPage: React.FC = () => {
-  console.log('[DASHBOARD PAGE] Component rendering, auth state:', {
-    isAuthenticated: useAuthStore.getState().isAuthenticated,
-    user: useAuthStore.getState().user,
-    token: useAuthStore.getState().token
-  });
+  const { t } = useTranslation();
 
   const { user, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
@@ -74,13 +72,21 @@ const DashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedTimeRange, setSelectedTimeRange] = useState('week');
   const [showFixMyDay, setShowFixMyDay] = useState(false);
+  const [showPlanMyDay, setShowPlanMyDay] = useState(false);
   const [selectedRecentTask, setSelectedRecentTask] = useState<RecentTask | null>(null);
 
   useEffect(() => {
-    console.log('[DASHBOARD PAGE] useEffect triggered, isAuthenticated:', isAuthenticated);
-    
     fetchDashboardData();
     fetchMotivationalMessage();
+  }, [selectedTimeRange]);
+
+  // Refresh when a task is created anywhere in the app
+  useEffect(() => {
+    const handleTaskCreated = () => {
+      fetchDashboardData();
+    };
+    window.addEventListener('taskCreated', handleTaskCreated);
+    return () => window.removeEventListener('taskCreated', handleTaskCreated);
   }, [selectedTimeRange]);
 
   const fetchDashboardData = async () => {
@@ -242,9 +248,9 @@ const DashboardPage: React.FC = () => {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
+    if (hour < 12) return t('dashboard.greeting_morning');
+    if (hour < 18) return t('dashboard.greeting_afternoon');
+    return t('dashboard.greeting_evening');
   };
 
   const getCompletionColor = (rate: number) => {
@@ -291,7 +297,7 @@ const DashboardPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 pt-12">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -301,10 +307,10 @@ const DashboardPage: React.FC = () => {
             className="flex flex-col md:flex-row justify-between items-start md:items-center"
           >
             <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">
+              <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
                 {getGreeting()}, {user?.name}! 👋
               </h1>
-              <p className="text-gray-600">Here's your productivity overview</p>
+              <p className="text-gray-600 dark:text-gray-400">Here's your productivity overview</p>
             </div>
             
             <div className="flex items-center space-x-4 mt-4 md:mt-0">
@@ -352,11 +358,11 @@ const DashboardPage: React.FC = () => {
             onClick={() => openTasks()}
             role="button"
             tabIndex={0}
-            className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400"
+            className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm font-medium">Total Tasks</p>
+                <p className="text-gray-600 text-sm font-medium">{t('dashboard.totalTasks')}</p>
                 <p className="text-3xl font-bold text-gray-900">{stats?.totalTasks || 0}</p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
@@ -372,11 +378,11 @@ const DashboardPage: React.FC = () => {
             onClick={() => openTasks('?status=completed')}
             role="button"
             tabIndex={0}
-            className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400"
+            className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm font-medium">Completed</p>
+                <p className="text-gray-600 text-sm font-medium">{t('dashboard.completed')}</p>
                 <p className="text-3xl font-bold text-green-600">{stats?.completedTasks || 0}</p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
@@ -392,11 +398,11 @@ const DashboardPage: React.FC = () => {
             onClick={openAnalytics}
             role="button"
             tabIndex={0}
-            className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400"
+            className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm font-medium">Completion Rate</p>
+                <p className="text-gray-600 text-sm font-medium">{t('dashboard.completionRate')}</p>
                 <p className={`text-3xl font-bold ${getCompletionColor(stats?.completionRate || 0)}`}>
                   {stats?.completionRate || 0}%
                 </p>
@@ -414,11 +420,11 @@ const DashboardPage: React.FC = () => {
             onClick={openAnalytics}
             role="button"
             tabIndex={0}
-            className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400"
+            className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm font-medium">Time Spent</p>
+                <p className="text-gray-600 text-sm font-medium">{t('dashboard.timeSpent')}</p>
                 <p className="text-3xl font-bold text-orange-600">
                   {Math.round((stats?.totalTimeSpent || 0) / 60)}h
                 </p>
@@ -437,15 +443,15 @@ const DashboardPage: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
-            className="lg:col-span-2 bg-white rounded-2xl p-6 shadow-lg"
+            className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg"
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Recent Tasks</h2>
+              <h2 className="text-xl font-bold text-gray-900">{t('dashboard.recentTasks')}</h2>
               <Link
                 to="/tasks"
                 className="flex items-center space-x-1 text-purple-600 hover:text-purple-800 transition-colors"
               >
-                <span className="text-sm font-medium">View all</span>
+                <span className="text-sm font-medium">{t('common.viewAll')}</span>
                 <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
@@ -508,10 +514,10 @@ const DashboardPage: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.7 }}
-            className="bg-white rounded-2xl p-6 shadow-lg"
+            className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg"
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Achievements</h2>
+              <h2 className="text-xl font-bold text-gray-900">{t('dashboard.achievements')}</h2>
               <Award className="w-6 h-6 text-yellow-500" />
             </div>
 
@@ -576,9 +582,9 @@ const DashboardPage: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8 }}
-          className="mt-8 bg-white rounded-2xl p-6 shadow-lg"
+          className="mt-8 bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg"
         >
-          <h2 className="text-xl font-bold text-gray-900 mb-6">Quick Actions</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-6">{t('dashboard.quickActions')}</h2>
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Link
@@ -630,11 +636,34 @@ const DashboardPage: React.FC = () => {
               </div>
               <span className="text-sm font-medium text-gray-700">Fix My Day</span>
             </button>
+
+            <button
+              onClick={() => setShowPlanMyDay(true)}
+              className="flex flex-col items-center space-y-2 p-4 bg-pink-50 rounded-xl hover:bg-pink-100 transition-colors group"
+            >
+              <div className="w-12 h-12 bg-pink-600 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Sparkles className="w-6 h-6 text-white" />
+              </div>
+              <span className="text-sm font-medium text-gray-700">Plan My Day</span>
+            </button>
+
+            <Link
+              to="/habits"
+              className="flex flex-col items-center space-y-2 p-4 bg-orange-50 rounded-xl hover:bg-orange-100 transition-colors group"
+            >
+              <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                <span className="text-white text-xl">🔥</span>
+              </div>
+              <span className="text-sm font-medium text-gray-700">Habits</span>
+            </Link>
           </div>
         </motion.div>
 
         {/* Fix My Day Modal */}
         <FixMyDayModal isOpen={showFixMyDay} onClose={() => setShowFixMyDay(false)} />
+
+        {/* Plan My Day Modal */}
+        <PlanMyDay isOpen={showPlanMyDay} onClose={() => setShowPlanMyDay(false)} />
 
         {/* Recent Task Preview */}
         <AnimatePresence>

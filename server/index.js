@@ -35,6 +35,7 @@ const analyticsRoutes = require('./routes/analytics');
 const notificationRoutes = require('./routes/notifications');
 const userChallengesRoutes = require('./routes/userChallenges');
 const fixMyDayRoutes = require('./routes/fixMyDay');
+const habitRoutes = require('./routes/habits');
 
 // Import middleware
 const authMiddleware = require('./middleware/auth');
@@ -43,6 +44,8 @@ const errorHandler = require('./middleware/errorHandler');
 // Import services
 const { initializeDataRetention } = require('./services/dataRetentionService');
 const { isPushConfigured } = require('./services/pushNotificationService');
+const { initRecurringTaskScheduler } = require('./services/recurringTaskService');
+const { initNotificationScheduler } = require('./services/notificationScheduler');
 
 const app = express();
 const server = http.createServer(app);
@@ -63,6 +66,8 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/aby-produ
   console.log('🚀 Connected to MongoDB');
   // Initialize data retention service after DB connection
   initializeDataRetention();
+  initRecurringTaskScheduler();
+  initNotificationScheduler(io);
 })
 .catch(err => {
   console.error('❌ MongoDB connection error:', err);
@@ -137,6 +142,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/user-challenges', userChallengesRoutes);
 app.use('/api/fix-my-day', fixMyDayRoutes);
+app.use('/api/habits', habitRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

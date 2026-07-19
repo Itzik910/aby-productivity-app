@@ -9,6 +9,19 @@ import {
   Award,
   Zap
 } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from 'recharts';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -117,7 +130,7 @@ const AnalyticsPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 pb-20">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 pt-14 pb-20">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -254,6 +267,58 @@ const AnalyticsPage: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Recharts section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+          {/* Weekly bar chart */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Tasks per Day</h3>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={analyticsData.weeklyProgress} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="day" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip />
+                <Bar dataKey="completed" fill="#7c3aed" radius={[4, 4, 0, 0]} name="Completed" />
+                <Bar dataKey="target" fill="#e5e7eb" radius={[4, 4, 0, 0]} name="Target" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Category pie chart */}
+          {analyticsData.categories.length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">By Category</h3>
+              {(() => {
+                const PIE_COLORS = ['#7c3aed', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#6b7280'];
+                const pieData = analyticsData.categories
+                  .filter((c: any) => c.total > 0)
+                  .map((c: any) => ({ name: c.name, value: c.total }));
+                return (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={85}
+                        paddingAngle={3}
+                        dataKey="value"
+                      >
+                        {pieData.map((_: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend iconType="circle" iconSize={10} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                );
+              })()}
+            </div>
+          )}
         </div>
       </div>
     </div>

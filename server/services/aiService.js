@@ -1,7 +1,7 @@
 const AIUsage = require('../models/AIUsage');
 const User = require('../models/User');
 const Task = require('../models/Task');
-const { getPlaceSuggestions } = require('./placeService');
+const { getPlaceSuggestions, isDIYTask } = require('./placeService');
 
 let openai = null;
 
@@ -24,10 +24,20 @@ class AIService {
   async generateFiveWays(task, user) {
     const taskCtx = this.buildDetailedTaskContext(task);
     const userCtx = this.buildDetailedUserContext(user);
+    const taskIsDIY = isDIYTask(task);
     const placeSuggestions = await getPlaceSuggestions(task, user);
     const placeCtx = this.buildPlaceContext(placeSuggestions);
     const homeAddress = user?.addresses?.home || 'Not provided';
     const workAddress = user?.addresses?.work || 'Not provided';
+
+    // For DIY/home tasks, weight approaches towards diy + timing + collaboration
+    const defaultTypes = taskIsDIY
+      ? ['diy', 'step_by_step', 'timing_based', 'collaboration', 'hire_service']
+      : ['diy', 'hire_service', 'location_based', 'timing_based', 'collaboration'];
+
+    const diyNote = taskIsDIY
+      ? '\nNOTE: This is a HOME/DIY task. Do NOT suggest finding physical shops or external locations. Focus on: self-completion steps, gathering materials already at home, scheduling, online ordering, or hiring someone to come to the home address.'
+      : '';
 
     console.log('[AI FIVE-WAYS DEBUG] Context snapshot:', {
       taskId: task?._id,
@@ -40,7 +50,13 @@ class AIService {
     console.log('[AI FIVE-WAYS DEBUG] Places sent to OpenAI:', JSON.stringify(placeSuggestions, null, 2));
     console.log('[AI FIVE-WAYS DEBUG] Place context:', placeCtx || 'No nearby businesses were found.');
 
-    const defaultTypes = ['diy', 'hire_service', 'location_based', 'timing_based', 'collaboration'];
+    const defaultTypes = taskIsDIY
+      ? ['diy', 'step_by_step', 'timing_based', 'collaboration', 'hire_service']
+      : ['diy', 'hire_service', 'location_based', 'timing_based', 'collaboration'];
+
+    const diyNote = taskIsDIY
+      ? '\nNOTE: This is a HOME/DIY task. Do NOT suggest finding physical shops or external locations. Focus on: self-completion steps, gathering materials already at home, scheduling, online ordering, or hiring someone to come to the home address.'
+      : '';
 
     if (!openai) {
       return this.enrichFiveWays(this.getFiveWaysFallback(task, placeSuggestions), task, user, placeSuggestions);
@@ -80,7 +96,7 @@ TASK:\n${taskCtx}\n\nUSER:\n${userCtx}\n\nNEARBY BUSINESSES:\n${placeCtx || 'No 
             role: 'user',
             content: `You are ABY. For the task below, generate highly tailored, specific instructions for exactly ${approachTypes.length} ways to complete it.
             Approach types in order: ${approachTypes.join(', ')}
-
+${diyNote}
 TASK:\n${taskCtx}
 
 HOME ADDRESS:\n${homeAddress}
@@ -181,6 +197,94 @@ Return ONLY a valid JSON array of exactly ${approachTypes.length} objects, each 
       
       return `${index + 1}. Name: "${place.name}" | Address: ${place.address}${travelInfo} | Rating: ${rating} | Estimated Cost: ${cost}`;
     }).join('\n');
+  }
+
+  async planMyDay(tasks, user) {
+    const today = new Date().toISOString().split('T')[0];
+    const homeAddress = user?.addresses?.home || 'unknown';
+    const workAddress = user?.addresses?.work || 'unknown';
+
+    const taskList = tasks.slice(0, 20).map((t, i) => (
+      `${i + 1}. "${t.title}" | priority: ${t.priority} | due: ${t.dueDate?.toString().split('T')[0] || 'no date'} | category: ${t.category}${t.location?.name ? ` | location: ${t.location.name}` : ''}`
+    )).join('\n');
+
+    const fallback = () => tasks
+      .sort((a, b) => {
+        const pOrder = { urgent: 4, high: 3, medium: 2, low: 1 };
+        return (pOrder[b.priority] || 0) - (pOrder[a.priority] || 0);
+      })
+      .slice(0, 10)
+      .map((t, i) => ({
+        order: i + 1,
+        taskId: String(t._id),
+        title: t.title,
+        reason: `Priority: ${t.priority}`,
+        suggestedTime: `${9 + i}:00`,
+        estimatedMinutes: t.estimatedDuration || 30,
+      }));
+
+    if (!openai) return { schedule: fallback(), morningBriefing: `Today you have ${tasks.length} tasks. Start with your highest priority items.` };
+
+    try {
+      const response = await openai.chat.completions.create({
+        model: this.defaultModel,
+        messages: [{
+          role: 'user',
+          content: `You are ABY, a smart productivity assistant. Today is ${today}.
+User's home: ${homeAddress}. Work: ${workAddress}.
+Plan an optimized schedule for these tasks:
+${taskList}
+
+Return ONLY a valid JSON object with:
+- "morningBriefing": string (1-2 sentences, motivational, mentions total tasks and key priority)
+- "schedule": array of objects, each with: taskId (from list number, return as "task_N"), title, order (1-based), reason (why this order), suggestedTime ("HH:MM"), estimatedMinutes
+Order by: urgency, deadline proximity, location efficiency.`
+        }],
+        max_tokens: 1000,
+        temperature: 0.3,
+      });
+
+      const parsed = this.parseJsonResponse(response.choices[0].message.content);
+      return parsed;
+    } catch (error) {
+      console.error('planMyDay error:', error.message);
+      return { schedule: fallback(), morningBriefing: `Today you have ${tasks.length} tasks. Start with your highest priority items.` };
+    }
+  }
+
+  async breakdownTaskToSteps(task) {
+    const fallback = () => [
+      { title: 'Define the scope and requirements', description: '' },
+      { title: 'Gather necessary resources or information', description: '' },
+      { title: 'Execute the main work', description: '' },
+      { title: 'Review and check quality', description: '' },
+      { title: 'Mark complete or follow up', description: '' },
+    ];
+
+    if (!openai) return fallback();
+
+    try {
+      const response = await openai.chat.completions.create({
+        model: this.defaultModel,
+        messages: [{
+          role: 'user',
+          content: `You are ABY. Break down this task into 4-6 concrete, actionable subtasks.
+Task: "${task.title}"
+Category: ${task.category}
+Description: ${task.description || 'None'}
+
+Return ONLY a JSON array of objects, each with "title" (max 80 chars) and "description" (optional, one sentence).`,
+        }],
+        max_tokens: 600,
+        temperature: 0.2,
+      });
+      const steps = this.parseJsonResponse(response.choices[0].message.content);
+      if (!Array.isArray(steps) || steps.length < 2) return fallback();
+      return steps;
+    } catch (error) {
+      console.error('breakdownTaskToSteps error:', error.message);
+      return fallback();
+    }
   }
 
   parseJsonResponse(content) {
@@ -503,6 +607,84 @@ Return as a JSON array of strings containing 3 distinct localized suggestions.
       return JSON.parse(response.choices[0].message.content);
     } catch (error) {
       return { insights: ['Consistent approach'], recommendations: ['Batch similar tasks'] };
+    }
+  }
+
+  async parseNaturalLanguageTask(text) {
+    const today = new Date().toISOString().split('T')[0];
+    const prompt = `You are a task-parsing assistant. Today's date is ${today}.
+Parse the following natural-language task description into structured fields.
+Return ONLY a valid JSON object with these fields:
+- "title": string (required, the core task, max 100 chars)
+- "dueDate": ISO date string YYYY-MM-DD or null if not mentioned
+- "priority": one of "low","medium","high","urgent" (infer from words like "urgent","ASAP","important")
+- "category": one of "work","personal","health","learning","social","finance","home","other"
+- "description": string (any extra details not in title, or "")
+
+INPUT: "${text.replace(/"/g, '\\"')}"`;
+
+    if (!openai) {
+      return this._nlpFallback(text);
+    }
+
+    try {
+      const response = await openai.chat.completions.create({
+        model: this.defaultModel,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 300,
+        temperature: 0.1,
+      });
+      return this.parseJsonResponse(response.choices[0].message.content);
+    } catch (error) {
+      console.error('NLP parse error:', error.message);
+      return this._nlpFallback(text);
+    }
+  }
+
+  _nlpFallback(text) {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dueDateStr = tomorrow.toISOString().split('T')[0];
+
+    const isUrgent = /urgent|asap|immediately|now/i.test(text);
+    const isHigh = /important|critical|must|today/i.test(text);
+    let priority = 'medium';
+    if (isUrgent) priority = 'urgent';
+    else if (isHigh) priority = 'high';
+
+    return {
+      title: text.slice(0, 100),
+      dueDate: dueDateStr,
+      priority,
+      category: 'personal',
+      description: '',
+    };
+  }
+
+  async getStepHint(task, step) {
+    const fallback = `To complete "${step.title}": break it into small actions, look up guidance online if needed, and set a time block.`;
+
+    if (!openai) return fallback;
+
+    try {
+      const response = await openai.chat.completions.create({
+        model: this.defaultModel,
+        messages: [{
+          role: 'user',
+          content: `You are ABY. The user is working on a task and needs a short, helpful inline hint for one specific step.
+
+TASK: "${task.title}" (category: ${task.category})
+STEP: "${step.title}"
+
+Write 1-3 sentences of practical advice for this step. Be specific, concrete, and to the point. Do NOT repeat the step title. Use real-world knowledge (e.g. typical cost ranges, tools needed, time estimates). Max 60 words.`
+        }],
+        max_tokens: 120,
+        temperature: 0.4,
+      });
+      return response.choices[0].message.content.trim();
+    } catch (error) {
+      console.error('getStepHint error:', error.message);
+      return fallback;
     }
   }
 }

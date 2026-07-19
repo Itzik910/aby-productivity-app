@@ -3,6 +3,26 @@ const axios = require('axios');
 const MAX_RESULTS = 3;
 const DEBUG_PLACES = process.env.ABY_DEBUG_PLACES === 'true';
 
+// Tasks matching these patterns are best done at home (DIY) —
+// no point searching for a nearby business.
+const DIY_HOME_PATTERNS = [
+  /paint|צבע/i,
+  /clean|nik|נקה|שטיפה|ניקיון|dishes|כלים|wash clothes|כביסה|vacuum|laundry/i,
+  /hang|תלה|תמונה|assemble|לונה|להרכיב/i,
+  /cook|לבשל|bake|אפה/i,
+  /study|ללמוד|learn|revision|חזרה|homework|שיעורי בית/i,
+  /organize|לארגן|declutter/i,
+  /repair.*home|תיקון.*בית|fix.*pipe|תיקון.*צינור/i,
+  /workout.*home|אימון.*בית/i,
+];
+
+function isDIYTask(task = {}) {
+  const haystack = [task.title, task.description].filter(Boolean).join(' ');
+  const matchesDIY = DIY_HOME_PATTERNS.some((p) => p.test(haystack));
+  const isHomeCategory = (task.category || '').toLowerCase() === 'home';
+  return matchesDIY || isHomeCategory;
+}
+
 function placeDebug(...args) {
   if (DEBUG_PLACES) {
     console.log('[PLACE DEBUG]', ...args);
@@ -165,6 +185,12 @@ async function searchPlaces(query) {
 }
 
 async function getPlaceSuggestions(task, user) {
+  // Skip place lookup for DIY/home tasks — they need no physical destination
+  if (isDIYTask(task)) {
+    placeDebug('getPlaceSuggestions: DIY/home task detected, skipping place lookup', { title: task?.title });
+    return [];
+  }
+
   const queries = buildQueries(task, user);
   if (queries.length === 0) {
     placeDebug('getPlaceSuggestions no queries', { taskTitle: task?.title });
@@ -193,5 +219,6 @@ async function getPlaceSuggestions(task, user) {
 
 module.exports = {
   getPlaceSuggestions,
-  derivePlaceKeyword
+  derivePlaceKeyword,
+  isDIYTask
 };
