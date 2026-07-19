@@ -50,14 +50,6 @@ class AIService {
     console.log('[AI FIVE-WAYS DEBUG] Places sent to OpenAI:', JSON.stringify(placeSuggestions, null, 2));
     console.log('[AI FIVE-WAYS DEBUG] Place context:', placeCtx || 'No nearby businesses were found.');
 
-    const defaultTypes = taskIsDIY
-      ? ['diy', 'step_by_step', 'timing_based', 'collaboration', 'hire_service']
-      : ['diy', 'hire_service', 'location_based', 'timing_based', 'collaboration'];
-
-    const diyNote = taskIsDIY
-      ? '\nNOTE: This is a HOME/DIY task. Do NOT suggest finding physical shops or external locations. Focus on: self-completion steps, gathering materials already at home, scheduling, online ordering, or hiring someone to come to the home address.'
-      : '';
-
     if (!openai) {
       return this.enrichFiveWays(this.getFiveWaysFallback(task, placeSuggestions), task, user, placeSuggestions);
     }
