@@ -153,8 +153,16 @@ const FixMyDayModal: React.FC<FixMyDayModalProps> = ({ isOpen, onClose }) => {
         preferredLocation: preferredLocation || 'both',
         selectedTaskIds: taskOrderMode === 'manual' && selectedTaskIds.length > 0 ? selectedTaskIds : undefined,
       });
-      setOptimizedRoute(response.data.data);
+      const routeData = response.data.data;
+      setOptimizedRoute(routeData);
       setActiveTab('todayRoute');
+      // Persist last route so user can re-open it later
+      try {
+        localStorage.setItem(
+          'aby-last-fix-my-day',
+          JSON.stringify({ route: routeData, preferredLocation: preferredLocation || 'both', savedAt: new Date().toISOString() })
+        );
+      } catch { /* localStorage quota — silently skip */ }
     } catch (error: any) {
       console.error('Error generating route:', error);
       toast.error(error.response?.data?.message || error.message || 'Failed to generate route');
@@ -440,12 +448,35 @@ const FixMyDayModal: React.FC<FixMyDayModalProps> = ({ isOpen, onClose }) => {
       );
     }
 
-    // Default: plan tab
+    // Default: plan tab — show "View Last Route" if one is stored
+    const savedRouteRaw = localStorage.getItem('aby-last-fix-my-day');
+    const savedRoute = savedRouteRaw ? (() => { try { return JSON.parse(savedRouteRaw); } catch { return null; } })() : null;
+
     return (
       <div className="text-center py-6">
         <Sparkles className="w-16 h-16 text-purple-500 mx-auto mb-4" />
         <h3 className="text-xl font-semibold text-gray-900 mb-2">Where should ABY focus today?</h3>
-        <p className="text-gray-600 mb-6">
+
+        {savedRoute && (
+          <div className="mb-4 max-w-md mx-auto">
+            <button
+              onClick={() => {
+                setOptimizedRoute(savedRoute.route);
+                setPreferredLocation(savedRoute.preferredLocation || 'both');
+                setActiveTab('todayRoute');
+              }}
+              className="w-full px-4 py-2 border border-purple-300 text-purple-700 rounded-xl text-sm hover:bg-purple-50 transition-colors flex items-center justify-center gap-2"
+            >
+              <Route className="w-4 h-4" />
+              View last route
+              {savedRoute.savedAt && (
+                <span className="text-xs text-gray-400 ml-1">
+                  ({new Date(savedRoute.savedAt).toLocaleDateString()})
+                </span>
+              )}
+            </button>
+          </div>
+        )}        <p className="text-gray-600 mb-6">
           Pick a mode and I'll tune the recommendations accordingly.
         </p>
         <div className="grid grid-cols-2 gap-3 max-w-md mx-auto">

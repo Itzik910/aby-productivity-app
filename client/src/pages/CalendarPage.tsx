@@ -8,8 +8,10 @@ import {
   MapPin, 
   AlertCircle,
   CheckCircle,
-  Search
+  Search,
+  X
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../services/api';
 import { useTaskModalStore } from '../stores/taskModalStore';
 import toast from 'react-hot-toast';
@@ -40,6 +42,7 @@ const CalendarPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [popupTask, setPopupTask] = useState<Task | null>(null);
   const openTaskModal = useTaskModalStore(state => state.openModal);
 
   // Fetch real tasks from API
@@ -170,7 +173,8 @@ const CalendarPage: React.FC = () => {
             {dayTasks.slice(0, 2).map(task => (
               <div
                 key={task._id}
-                className={`text-xs p-1 rounded truncate ${getPriorityColor(task.priority)} text-white`}
+                onClick={(e) => { e.stopPropagation(); setPopupTask(task); }}
+                className={`text-xs p-1 rounded truncate ${getPriorityColor(task.priority)} text-white cursor-pointer hover:opacity-90 transition-opacity`}
               >
                 {task.title}
               </div>
@@ -223,7 +227,8 @@ const CalendarPage: React.FC = () => {
                 {dayTasks.slice(0, 4).map(task => (
                   <div
                     key={task._id}
-                    className={`text-xs p-2 rounded-lg truncate ${getPriorityColor(task.priority)} text-white`}
+                    onClick={(e) => { e.stopPropagation(); setPopupTask(task); }}
+                    className={`text-xs p-2 rounded-lg truncate ${getPriorityColor(task.priority)} text-white cursor-pointer hover:opacity-90 transition-opacity`}
                   >
                     {task.title}
                   </div>
@@ -242,7 +247,7 @@ const CalendarPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 pt-14">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -464,6 +469,98 @@ const CalendarPage: React.FC = () => {
       </div>
 
       {/* Remove Task Modal since we're using global modal */}
+
+      {/* Task Detail Popup */}
+      <AnimatePresence>
+        {popupTask && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+            onClick={() => setPopupTask(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className={`h-2 w-full ${getPriorityColor(popupTask.priority)}`} />
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white leading-snug pr-2">
+                    {popupTask.title}
+                  </h3>
+                  <button onClick={() => setPopupTask(null)} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {popupTask.description && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{popupTask.description}</p>
+                )}
+
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-xl bg-gray-50 dark:bg-gray-800 p-3">
+                    <div className="text-xs text-gray-400 mb-0.5">Due</div>
+                    <div className="font-medium text-gray-900 dark:text-white">
+                      {new Date(popupTask.dueDate).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-gray-50 dark:bg-gray-800 p-3">
+                    <div className="text-xs text-gray-400 mb-0.5">Priority</div>
+                    <div className={`font-medium capitalize ${
+                      popupTask.priority === 'urgent' ? 'text-red-600'
+                      : popupTask.priority === 'high' ? 'text-orange-600'
+                      : popupTask.priority === 'medium' ? 'text-yellow-600'
+                      : 'text-green-600'
+                    }`}>{popupTask.priority}</div>
+                  </div>
+                  <div className="rounded-xl bg-gray-50 dark:bg-gray-800 p-3">
+                    <div className="text-xs text-gray-400 mb-0.5">Category</div>
+                    <div className="font-medium text-gray-900 dark:text-white capitalize">{popupTask.category}</div>
+                  </div>
+                  <div className="rounded-xl bg-gray-50 dark:bg-gray-800 p-3">
+                    <div className="text-xs text-gray-400 mb-0.5">Status</div>
+                    <div className="font-medium text-gray-900 dark:text-white capitalize">
+                      {popupTask.status.replace('_', ' ')}
+                    </div>
+                  </div>
+                </div>
+
+                {popupTask.location?.name && (
+                  <div className="mt-3 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                    <MapPin className="w-4 h-4 flex-shrink-0" />
+                    <span>{popupTask.location.name}</span>
+                  </div>
+                )}
+
+                {popupTask.estimatedDuration && (
+                  <div className="mt-2 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                    <Clock className="w-4 h-4 flex-shrink-0" />
+                    <span>{popupTask.estimatedDuration} min</span>
+                  </div>
+                )}
+
+                <div className="mt-4">
+                  <div className="flex justify-between text-xs text-gray-400 mb-1">
+                    <span>Progress</span>
+                    <span>{popupTask.progress.percentage}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div
+                      className="h-2 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all"
+                      style={{ width: `${popupTask.progress.percentage}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

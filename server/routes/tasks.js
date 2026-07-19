@@ -5,6 +5,7 @@ const User = require('../models/User');
 const AIUsage = require('../models/AIUsage');
 const { auth } = require('../middleware/auth');
 const { aiService } = require('../services/aiService');
+const { spawnNextOccurrence } = require('../services/recurringTaskService');
 
 // Get all tasks for user with filtering and pagination
 router.get('/', auth, async (req, res) => {
@@ -197,6 +198,13 @@ router.patch('/:id/complete', auth, async (req, res) => {
     await User.findByIdAndUpdate(req.user.id, {
       $inc: { 'stats.tasksCompleted': 1 }
     });
+
+    // Spawn next occurrence for recurring tasks
+    if (task.isRecurring) {
+      spawnNextOccurrence(task).catch((err) =>
+        console.error('[RECURRING] Failed to spawn next occurrence:', err)
+      );
+    }
 
     res.json(task);
   } catch (error) {
@@ -536,6 +544,233 @@ router.get('/:id/five-ways', auth, async (req, res) => {
   } catch (error) {
     console.error('Error generating five ways:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ─── Steps / Checklist ────────────────────────────────────────────────────────
+
+// @route   POST /tasks/:id/steps
+// @desc    Add a step to a task
+// @access  Private
+router.post('/:id/steps', auth, async (req, res) => {
+  try {
+    const task = await Task.findOne({ _id: req.params.id, user: req.user.id });
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+    const { title, description } = req.body;
+    if (!title) return res.status(400).json({ message: 'Step title is required' });
+    await task.addStep({ title, description });
+    res.json({ success: true, steps: task.steps });
+  } catch (error) {
+    console.error('Error adding step:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   PATCH /tasks/:id/steps/:stepIndex/complete
+// @desc    Mark a step as completed
+// @access  Private
+router.patch('/:id/steps/:stepIndex/complete', auth, async (req, res) => {
+  try {
+    const task = await Task.findOne({ _id: req.params.id, user: req.user.id });
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+    await task.completeStep(Number(req.params.stepIndex));
+    res.json({ success: true, steps: task.steps, progress: task.progress });
+  } catch (error) {
+    console.error('Error completing step:', error);
+    res.status(500).json({ message: error.message || 'Server error' });
+  }
+});
+
+// @route   PATCH /tasks/:id/steps/:stepIndex/uncomplete
+// @desc    Unmark a step (toggle off)
+// @access  Private
+router.patch('/:id/steps/:stepIndex/uncomplete', auth, async (req, res) => {
+  try {
+    const task = await Task.findOne({ _id: req.params.id, user: req.user.id });
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+    const idx = Number(req.params.stepIndex);
+    if (!task.steps[idx]) return res.status(404).json({ message: 'Step not found' });
+    task.steps[idx].isCompleted = false;
+    task.steps[idx].completedAt = undefined;
+    await task.save();
+    res.json({ success: true, steps: task.steps, progress: task.progress });
+  } catch (error) {
+    console.error('Error uncompleting step:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   DELETE /tasks/:id/steps/:stepIndex
+// @desc    Delete a step from a task
+// @access  Private
+router.delete('/:id/steps/:stepIndex', auth, async (req, res) => {
+  try {
+    const task = await Task.findOne({ _id: req.params.id, user: req.user.id });
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+    const idx = Number(req.params.stepIndex);
+    if (!task.steps[idx]) return res.status(404).json({ message: 'Step not found' });
+    task.steps.splice(idx, 1);
+    task.steps.forEach((s, i) => { s.order = i + 1; });
+    await task.save();
+    res.json({ success: true, steps: task.steps, progress: task.progress });
+  } catch (error) {
+    console.error('Error deleting step:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ─── Collaborators / Sharing ──────────────────────────────────────────────────
+
+// @route   POST /tasks/:id/collaborators
+// @desc    Invite a collaborator by email
+// @access  Private
+router.post('/:id/collaborators', auth, async (req, res) => {
+  try {
+    const task = await Task.findOne({ _id: req.params.id, user: req.user.id });
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    const { email, role = 'viewer' } = req.body;
+    if (!email) return res.status(400).json({ message: 'email is required' });
+    if (!['viewer', 'editor'].includes(role)) return res.status(400).json({ message: 'Invalid role' });
+
+    const invitee = await User.findOne({ email: email.toLowerCase() });
+    if (!invitee) return res.status(404).json({ message: 'User with that email not found' });
+    if (String(invitee._id) === String(req.user.id)) return res.status(400).json({ message: 'Cannot invite yourself' });
+
+    const alreadyAdded = task.collaborators.some(
+      (c) => String(c.user) === String(invitee._id)
+    );
+    if (alreadyAdded) return res.status(400).json({ message: 'Already a collaborator' });
+
+    task.collaborators.push({ user: invitee._id, role, invitedAt: new Date() });
+    await task.save();
+
+    res.json({ success: true, collaborators: task.collaborators, collaboratorName: invitee.name });
+  } catch (error) {
+    console.error('Error adding collaborator:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   DELETE /tasks/:id/collaborators/:userId
+// @desc    Remove a collaborator
+// @access  Private (task owner only)
+router.delete('/:id/collaborators/:userId', auth, async (req, res) => {
+  try {
+    const task = await Task.findOne({ _id: req.params.id, user: req.user.id });
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    task.collaborators = task.collaborators.filter(
+      (c) => String(c.user) !== req.params.userId
+    );
+    await task.save();
+    res.json({ success: true, collaborators: task.collaborators });
+  } catch (error) {
+    console.error('Error removing collaborator:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   GET /tasks/shared
+// @desc    Get tasks shared with the current user (as a collaborator)
+// @access  Private
+router.get('/shared', auth, async (req, res) => {
+  try {
+    const tasks = await Task.find({
+      'collaborators.user': req.user.id,
+      status: { $ne: 'cancelled' },
+    })
+      .populate('user', 'name email avatar')
+      .sort({ dueDate: 1 })
+      .limit(50);
+    res.json({ success: true, tasks });
+  } catch (error) {
+    console.error('Error fetching shared tasks:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST /tasks/nlp-parse
+// @desc    Parse a natural language string into structured task fields using AI
+// @access  Private
+router.post('/nlp-parse', auth, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ success: false, message: 'text is required' });
+    }
+
+    const { aiService: ai } = require('../services/aiService');
+    const result = await ai.parseNaturalLanguageTask(text);
+    res.json({ success: true, parsed: result });
+  } catch (error) {
+    console.error('Error parsing NLP task:', error);
+    res.status(500).json({ success: false, message: 'Failed to parse task' });
+  }
+});
+
+// @route   POST /tasks/plan-my-day
+// @desc    Use AI to generate an optimized schedule for today's pending tasks
+// @access  Private
+router.post('/plan-my-day', auth, async (req, res) => {
+  try {
+    const [tasks, user] = await Promise.all([
+      Task.find({ user: req.user.id, status: 'pending' }).sort({ priority: -1, dueDate: 1 }).limit(20),
+      User.findById(req.user.id),
+    ]);
+
+    if (tasks.length === 0) {
+      return res.json({ success: true, schedule: [], morningBriefing: "You're all caught up! No pending tasks for today." });
+    }
+
+    const result = await aiService.planMyDay(tasks, user);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('Error in plan-my-day:', error);
+    res.status(500).json({ success: false, message: 'Failed to plan your day' });
+  }
+});
+
+// @route   POST /tasks/:id/breakdown
+// @desc    Use AI to break a task into subtasks and add them as steps
+// @access  Private
+router.post('/:id/breakdown', auth, async (req, res) => {
+  try {
+    const task = await Task.findOne({ _id: req.params.id, user: req.user.id });
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    const steps = await aiService.breakdownTaskToSteps(task);
+
+    task.steps = [];
+    steps.forEach(({ title, description }, i) => {
+      task.steps.push({ title, description: description || '', order: i + 1, isCompleted: false });
+    });
+    await task.save();
+
+    res.json({ success: true, steps: task.steps, progress: task.progress });
+  } catch (error) {
+    console.error('Error breaking down task:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   POST /tasks/:id/steps/:stepIndex/hint
+// @desc    Get a short AI hint for a specific step (inline dropdown)
+// @access  Private
+router.post('/:id/steps/:stepIndex/hint', auth, async (req, res) => {
+  try {
+    const task = await Task.findOne({ _id: req.params.id, user: req.user.id });
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    const idx = Number(req.params.stepIndex);
+    const step = task.steps[idx];
+    if (!step) return res.status(404).json({ message: 'Step not found' });
+
+    const hint = await aiService.getStepHint(task, step);
+    res.json({ success: true, hint });
+  } catch (error) {
+    console.error('Error getting step hint:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

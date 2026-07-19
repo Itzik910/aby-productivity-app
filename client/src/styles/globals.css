@@ -8,4 +8,20 @@ body {
   color: #1f2937;
   margin: 0;
   padding: 0;
+}
+
+/* Push all page content below the fixed TopBar (h-12 = 3rem) */
+.App > *:not(.fixed) {
+  margin-top: 0;
+}
+
+/* Dark mode body */
+.dark body {
+  background: #111827;
+  color: #f9fafb;
+}
+
+/* RTL support */
+[dir="rtl"] .rtl-flip {
+  transform: scaleX(-1);
 } 

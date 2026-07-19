@@ -48,6 +48,8 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   const [locationName, setLocationName] = useState('');
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrencePattern, setRecurrencePattern] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
 
   useEffect(() => {
     if (initialDate) {
@@ -66,6 +68,8 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     setLocationName('');
     setTagInput('');
     setTags([]);
+    setIsRecurring(false);
+    setRecurrencePattern('weekly');
   };
 
   const handleAddTag = (e: React.KeyboardEvent) => {
@@ -86,7 +90,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     if (!canCreate) return;
 
     try {
-      const taskData = {
+      const taskData: Record<string, unknown> = {
         title: title.trim(),
         description,
         category,
@@ -96,6 +100,10 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         tags,
         location: locationName.trim() ? { name: locationName.trim(), address: '' } : undefined,
       };
+      if (isRecurring) {
+        taskData.isRecurring = true;
+        taskData.recurrence = { pattern: recurrencePattern, interval: 1 };
+      }
 
       await api.post('/tasks', taskData);
       toast.success('Task created! 🎉');
@@ -323,6 +331,39 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                       </div>
                     )}
                   </div>
+
+                  {/* Recurring */}
+                  <div className="flex items-center justify-between py-2 border-t border-gray-100">
+                    <label className="text-sm font-medium text-gray-600 flex items-center gap-1">
+                      <span>🔁</span>
+                      Repeat task
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsRecurring(!isRecurring)}
+                      className={`w-10 h-5 rounded-full transition-colors ${isRecurring ? 'bg-purple-600' : 'bg-gray-300'} relative`}
+                    >
+                      <span className={`block w-4 h-4 bg-white rounded-full shadow absolute top-0.5 transition-transform ${isRecurring ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                    </button>
+                  </div>
+                  {isRecurring && (
+                    <div className="flex gap-2">
+                      {(['daily', 'weekly', 'monthly'] as const).map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setRecurrencePattern(p)}
+                          className={`flex-1 py-1.5 text-xs rounded-lg border transition-colors ${
+                            recurrencePattern === p
+                              ? 'bg-purple-600 text-white border-purple-600'
+                              : 'border-gray-200 text-gray-600 hover:border-purple-300'
+                          }`}
+                        >
+                          {p.charAt(0).toUpperCase() + p.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>

@@ -4,106 +4,79 @@ const { auth } = require('../middleware/auth');
 const Task = require('../models/Task');
 const User = require('../models/User');
 const Challenge = require('../models/Challenge');
+const Notification = require('../models/Notification');
 
-// In-memory notification storage (in production, use Redis or MongoDB)
-const notifications = new Map();
-
-// Notification types
-const NOTIFICATION_TYPES = {
-  TASK_DUE: 'task_due',
-  TASK_OVERDUE: 'task_overdue',
-  CHALLENGE_STARTED: 'challenge_started',
-  CHALLENGE_COMPLETED: 'challenge_completed',
-  STREAK_MILESTONE: 'streak_milestone',
-  PRODUCTIVITY_INSIGHT: 'productivity_insight',
-  WEEKLY_SUMMARY: 'weekly_summary',
-  ACHIEVEMENT_UNLOCKED: 'achievement_unlocked',
-  REMINDER: 'reminder'
-};
-
-// Helper function to create notification
-const createNotification = (userId, type, title, message, data = {}) => {
-  const notification = {
-    id: Date.now() + Math.random(),
-    userId,
+// Helper: create notification and push via Socket.IO if available
+const createNotification = async (userId, type, title, message, data = {}, io = null) => {
+  const notification = await Notification.createForUser(userId, {
     type,
     title,
     message,
     data,
-    read: false,
-    createdAt: new Date(),
-    priority: data.priority || 'medium'
-  };
+    priority: data.priority || 'medium',
+  });
 
-  if (!notifications.has(userId)) {
-    notifications.set(userId, []);
-  }
-  
-  notifications.get(userId).unshift(notification);
-  
-  // Keep only last 100 notifications per user
-  if (notifications.get(userId).length > 100) {
-    notifications.get(userId).splice(100);
+  // Real-time delivery via Socket.IO
+  if (io) {
+    io.to(String(userId)).emit('notification', {
+      id: String(notification._id),
+      type: notification.type,
+      title: notification.title,
+      message: notification.message,
+      data: notification.data,
+      read: false,
+      createdAt: notification.createdAt.toISOString(),
+    });
   }
 
   return notification;
 };
 
-// Helper function to send email notification
-const sendEmailNotification = async (user, notification) => {
-  // In production, integrate with email service (SendGrid, Mailgun, etc.)
-  console.log(`Email notification sent to ${user.email}:`, {
-    subject: notification.title,
-    body: notification.message
-  });
-};
-
-// Helper function to send push notification
-const sendPushNotification = async (user, notification) => {
-  // In production, integrate with push service (FCM, APNs, etc.)
-  console.log(`Push notification sent to ${user.name}:`, {
-    title: notification.title,
-    body: notification.message
-  });
-};
+module.exports.createNotification = createNotification;
 
 // @route   GET /api/notifications
-// @desc    Get user notifications
+// @desc    Get user notifications (from MongoDB)
 // @access  Private
 router.get('/', auth, async (req, res) => {
   try {
     const userId = req.user.id;
     const { page = 1, limit = 20, unreadOnly = false } = req.query;
-    
-    const userNotifications = notifications.get(userId) || [];
-    
-    let filteredNotifications = userNotifications;
-    if (unreadOnly === 'true') {
-      filteredNotifications = userNotifications.filter(n => !n.read);
-    }
-    
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + parseInt(limit);
-    const paginatedNotifications = filteredNotifications.slice(startIndex, endIndex);
-    
-    const unreadCount = userNotifications.filter(n => !n.read).length;
-    
+
+    const query = { user: userId };
+    if (unreadOnly === 'true') query.read = false;
+
+    const [notifs, total, unreadCount] = await Promise.all([
+      Notification.find(query)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * parseInt(limit))
+        .limit(parseInt(limit))
+        .lean(),
+      Notification.countDocuments(query),
+      Notification.countDocuments({ user: userId, read: false }),
+    ]);
+
+    const formatted = notifs.map((n) => ({
+      id: String(n._id),
+      type: n.type,
+      title: n.title,
+      message: n.message,
+      data: n.data,
+      read: n.read,
+      createdAt: n.createdAt,
+      priority: n.priority,
+    }));
+
     res.json({
       success: true,
-      data: {
-        notifications: paginatedNotifications,
-        unreadCount,
-        totalCount: filteredNotifications.length,
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(filteredNotifications.length / limit)
-      }
+      notifications: formatted,
+      unreadCount,
+      totalCount: total,
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(total / parseInt(limit)),
     });
   } catch (error) {
     console.error('Error fetching notifications:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
@@ -114,36 +87,21 @@ router.post('/mark-read', auth, async (req, res) => {
   try {
     const userId = req.user.id;
     const { notificationIds, markAll = false } = req.body;
-    
-    const userNotifications = notifications.get(userId) || [];
-    
+
     if (markAll) {
-      userNotifications.forEach(notification => {
-        notification.read = true;
-      });
-    } else if (notificationIds && Array.isArray(notificationIds)) {
-      userNotifications.forEach(notification => {
-        if (notificationIds.includes(notification.id)) {
-          notification.read = true;
-        }
-      });
+      await Notification.updateMany({ user: userId, read: false }, { read: true, readAt: new Date() });
+    } else if (Array.isArray(notificationIds) && notificationIds.length) {
+      await Notification.updateMany(
+        { user: userId, _id: { $in: notificationIds } },
+        { read: true, readAt: new Date() }
+      );
     }
-    
-    const unreadCount = userNotifications.filter(n => !n.read).length;
-    
-    res.json({
-      success: true,
-      data: {
-        message: markAll ? 'All notifications marked as read' : 'Notifications marked as read',
-        unreadCount
-      }
-    });
+
+    const unreadCount = await Notification.countDocuments({ user: userId, read: false });
+    res.json({ success: true, unreadCount });
   } catch (error) {
     console.error('Error marking notifications as read:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

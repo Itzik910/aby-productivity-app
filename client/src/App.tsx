@@ -2,6 +2,9 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 
+// i18n — must be imported before any component that uses translations
+import './i18n';
+
 // Pages
 import WelcomePage from './pages/WelcomePage';
 import PremiumUpgradePage from './pages/PremiumUpgradePage';
@@ -15,15 +18,20 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import CalendarPage from './pages/CalendarPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import AchievementsPage from './pages/AchievementsPage';
+import HabitsPage from './pages/HabitsPage';
 
 // Components
 import DashboardButton from './components/DashboardButton';
 import CreateTaskModal from './components/CreateTaskModal';
+import TopBar from './components/TopBar';
+import CommandPalette from './components/CommandPalette';
+import NLPTaskModal from './components/NLPTaskModal';
 
 // Stores
 import { useAuthStore } from './stores/authStore';
 import { useThemeStore } from './stores/themeStore';
 import { useTaskModalStore } from './stores/taskModalStore';
+import { useLanguageStore } from './stores/languageStore';
 
 // Simple loading component
 const LoadingSpinner = ({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) => {
@@ -76,14 +84,50 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 function App() {
-  const { isLoading } = useAuthStore();
+  const { isLoading, logout } = useAuthStore();
   const { theme } = useThemeStore();
   const { isOpen: isTaskModalOpen, initialDate, closeModal } = useTaskModalStore();
+  const { isRtl } = useLanguageStore();
+  const [showCommandPalette, setShowCommandPalette] = React.useState(false);
+  const [showNLPModal, setShowNLPModal] = React.useState(false);
 
-  // Apply theme to document
+  // Listen for force-logout events fired by the API interceptor when the
+  // refresh token is expired, so the in-memory Zustand state is also cleared.
   React.useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
+    const handler = () => logout();
+    window.addEventListener('aby:force-logout', handler);
+    return () => window.removeEventListener('aby:force-logout', handler);
+  }, [logout]);
+
+  // Apply theme to document (supports 'auto' via prefers-color-scheme)
+  React.useEffect(() => {
+    const applyTheme = () => {
+      if (theme === 'auto') {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.classList.toggle('dark', prefersDark);
+      } else {
+        document.documentElement.classList.toggle('dark', theme === 'dark');
+      }
+    };
+    applyTheme();
+    if (theme === 'auto') {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      mq.addEventListener('change', applyTheme);
+      return () => mq.removeEventListener('change', applyTheme);
+    }
   }, [theme]);
+
+  // Ctrl+K / Cmd+K global shortcut for Command Palette
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowCommandPalette((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   if (isLoading) {
     return (
@@ -96,11 +140,21 @@ function App() {
   return (
     <Router>
       <div className="App">
+        <TopBar onOpenCommandPalette={() => setShowCommandPalette(true)} />
         <DashboardButton />
         <CreateTaskModal 
           isOpen={isTaskModalOpen} 
           onClose={closeModal}
           initialDate={initialDate}
+        />
+        <CommandPalette
+          isOpen={showCommandPalette}
+          onClose={() => setShowCommandPalette(false)}
+          onOpenNLP={() => { setShowCommandPalette(false); setShowNLPModal(true); }}
+        />
+        <NLPTaskModal
+          isOpen={showNLPModal}
+          onClose={() => setShowNLPModal(false)}
         />
         <Routes>
           {/* Public Routes */}
@@ -122,6 +176,7 @@ function App() {
           <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
           <Route path="/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
           <Route path="/achievements" element={<ProtectedRoute><AchievementsPage /></ProtectedRoute>} />
+          <Route path="/habits" element={<ProtectedRoute><HabitsPage /></ProtectedRoute>} />
           
           {/* Catch all route */}
           <Route path="*" element={

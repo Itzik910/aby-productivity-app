@@ -1,0 +1,8 @@
+fastapi>=0.110.0
+uvicorn>=0.28.0
+pymongo>=4.6.0
+python-dotenv>=1.0.0
+qdrant-client>=1.8.0
+llama-index-core>=0.10.20
+llama-index-vector-stores-qdrant>=0.1.4
+llama-index-embeddings-openai>=0.1.6

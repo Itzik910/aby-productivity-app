@@ -9,75 +9,101 @@ export const api = axios.create({
   },
 });
 
-// Request interceptor
+// Prevent concurrent refresh calls — one promise shared across all waiters
+let refreshPromise: Promise<void> | null = null;
+
+function forceLogout() {
+  localStorage.removeItem('auth-storage');
+  // Clear the Authorization header so no further requests carry the bad token
+  delete api.defaults.headers.common['Authorization'];
+  // Notify the rest of the app via a custom event so the Zustand auth store
+  // can clear its in-memory state without creating a circular import.
+  window.dispatchEvent(new CustomEvent('aby:force-logout'));
+}
+
+// Request interceptor — attach current token from localStorage
 api.interceptors.request.use(
   (config) => {
-    // Add auth token if available
-    const token = localStorage.getItem('auth-storage');
-    if (token) {
+    const raw = localStorage.getItem('auth-storage');
+    if (raw) {
       try {
-        const authData = JSON.parse(token);
+        const authData = JSON.parse(raw);
         if (authData.state?.token) {
           config.headers.Authorization = `Bearer ${authData.state.token}`;
         }
-      } catch (error) {
-        console.error('Error parsing auth token:', error);
+      } catch {
+        // malformed storage — ignore
       }
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor
+// Response interceptor — refresh once on 401, then force-logout if refresh also fails
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // Handle 401 errors (token expired)
+    // Don't intercept the refresh endpoint itself — would cause infinite loop
+    const isRefreshEndpoint = originalRequest?.url?.includes('/auth/refresh');
+    if (isRefreshEndpoint) {
+      forceLogout();
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
+      // Deduplicate concurrent refresh calls
+      if (!refreshPromise) {
+        refreshPromise = (async () => {
+          const raw = localStorage.getItem('auth-storage');
+          if (!raw) throw new Error('No stored credentials');
+
+          const authData = JSON.parse(raw);
+          const storedRefreshToken = authData.state?.refreshToken;
+          if (!storedRefreshToken) throw new Error('No refresh token');
+
+          const response = await axios.post(
+            `${api.defaults.baseURL}/auth/refresh`,
+            { refreshToken: storedRefreshToken },
+            { headers: { 'Content-Type': 'application/json' } }
+          );
+
+          const { token: newToken, refreshToken: newRefreshToken } = response.data.data;
+
+          // Persist updated tokens
+          const updatedAuthData = {
+            ...authData,
+            state: {
+              ...authData.state,
+              token: newToken,
+              refreshToken: newRefreshToken,
+            },
+          };
+          localStorage.setItem('auth-storage', JSON.stringify(updatedAuthData));
+          api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+        })().finally(() => {
+          refreshPromise = null;
+        });
+      }
+
       try {
-        // Try to refresh token
-        const token = localStorage.getItem('auth-storage');
-        if (token) {
-          const authData = JSON.parse(token);
-          if (authData.state?.refreshToken) {
-            const response = await api.post('/auth/refresh', {
-              refreshToken: authData.state.refreshToken,
-            });
-
-            const { token: newToken, refreshToken: newRefreshToken } = response.data.data;
-
-            // Update stored tokens
-            const updatedAuthData = {
-              ...authData,
-              state: {
-                ...authData.state,
-                token: newToken,
-                refreshToken: newRefreshToken,
-              },
-            };
-            localStorage.setItem('auth-storage', JSON.stringify(updatedAuthData));
-
-            // Retry original request with new token
-            originalRequest.headers.Authorization = `Bearer ${newToken}`;
-            return api(originalRequest);
+        await refreshPromise;
+        // Re-attach the new token and retry
+        const raw = localStorage.getItem('auth-storage');
+        if (raw) {
+          const { state } = JSON.parse(raw);
+          if (state?.token) {
+            originalRequest.headers.Authorization = `Bearer ${state.token}`;
           }
         }
-      } catch (refreshError) {
-        // Refresh failed, redirect to login
-        localStorage.removeItem('auth-storage');
-        // Don't use hard redirect as it interferes with React Router
-        // Let the ProtectedRoute component handle this naturally
-        console.warn('[API] Token refresh failed, auth state cleared. ProtectedRoute will handle redirect.');
-        return Promise.reject(refreshError);
+        return api(originalRequest);
+      } catch {
+        forceLogout();
+        return Promise.reject(error);
       }
     }
 
