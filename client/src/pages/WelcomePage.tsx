@@ -10,8 +10,7 @@ import {
   Trophy, 
   Bell, 
   Users,
-  ArrowRight,
-  Play
+  ArrowRight
 } from 'lucide-react';
 
 const WelcomePage: React.FC = () => {
@@ -76,17 +75,17 @@ const WelcomePage: React.FC = () => {
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="flex items-center space-x-4"
+            className="flex items-center space-x-6"
           >
             <Link
               to="/login"
-              className="text-gray-600 hover:text-purple-600 transition-colors"
+              className="text-gray-600 hover:text-purple-600 font-medium transition-colors"
             >
               Login
             </Link>
             <Link
               to="/register"
-              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-colors"
+              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
             >
               Get Started
             </Link>
@@ -135,11 +134,6 @@ const WelcomePage: React.FC = () => {
               <span>Let's Begin</span>
               <ArrowRight className="w-5 h-5" />
             </Link>
-            
-            <button className="flex items-center space-x-2 text-gray-600 hover:text-purple-600 transition-colors">
-              <Play className="w-5 h-5" />
-              <span>Watch Demo</span>
-            </button>
           </motion.div>
         </div>
       </section>

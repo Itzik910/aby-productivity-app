@@ -21,6 +21,28 @@ body {
   color: #f9fafb;
 }
 
+/* Auth pages (login, register, forgot-password) always use light colours
+   regardless of dark-mode setting, so text stays visible on white cards. */
+.auth-page {
+  color: #1f2937 !important;
+}
+.auth-page * {
+  color: inherit;
+}
+.auth-page label,
+.auth-page p,
+.auth-page h1,
+.auth-page h2,
+.auth-page h3,
+.auth-page span:not(.text-white):not(.text-purple-600):not(.text-red-600) {
+  color: #1f2937 !important;
+}
+.auth-page input,
+.auth-page textarea {
+  color: #1f2937 !important;
+  background: #ffffff !important;
+}
+
 /* RTL support */
 [dir="rtl"] .rtl-flip {
   transform: scaleX(-1);

@@ -210,27 +210,28 @@ const CalendarPage: React.FC = () => {
           return (
             <div
               key={day.toISOString()}
-              className={`min-h-64 border border-gray-200 p-3 cursor-pointer hover:bg-gray-50 ${
+              className={`min-h-16 sm:min-h-24 md:min-h-32 border border-gray-200 p-1 sm:p-2 cursor-pointer hover:bg-gray-50 ${
                 isToday ? 'bg-blue-50 border-blue-300' : ''
               } ${isSelected ? 'bg-purple-50 border-purple-300' : ''}`}
               onClick={() => setSelectedDate(day)}
               onDoubleClick={() => openTaskModal(day)}
               title="Double-click to add task"
             >
-              <div className="flex items-center justify-between mb-3">
-                <div className={`text-sm font-semibold ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>
+              <div className="flex items-center justify-between mb-1 sm:mb-3">
+                <div className={`text-[10px] sm:text-sm font-semibold hidden sm:block ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>
                   {dayNames[day.getDay()]}
                 </div>
-                <div className="text-sm text-gray-500">{day.getDate()}</div>
+                <div className={`text-xs sm:text-sm font-medium ${isToday ? 'text-blue-600' : 'text-gray-500'}`}>{day.getDate()}</div>
               </div>
-              <div className="space-y-2">
-                {dayTasks.slice(0, 4).map(task => (
+              <div className="space-y-0.5 sm:space-y-2">
+                {dayTasks.slice(0, 2).map(task => (
                   <div
                     key={task._id}
                     onClick={(e) => { e.stopPropagation(); setPopupTask(task); }}
-                    className={`text-xs p-2 rounded-lg truncate ${getPriorityColor(task.priority)} text-white cursor-pointer hover:opacity-90 transition-opacity`}
+                    className={`text-[10px] sm:text-xs p-0.5 sm:p-2 rounded sm:rounded-lg truncate ${getPriorityColor(task.priority)} text-white cursor-pointer hover:opacity-90 transition-opacity`}
                   >
-                    {task.title}
+                    <span className="hidden sm:inline">{task.title}</span>
+                    <span className="sm:hidden">●</span>
                   </div>
                 ))}
                 {dayTasks.length > 4 && (
@@ -338,26 +339,28 @@ const CalendarPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex gap-6">
+        <div className="flex flex-col lg:flex-row gap-6">
           {/* Calendar Grid */}
-          <div className="flex-1">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+          <div className="flex-1 min-w-0">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
               {/* Day Headers */}
-              <div className="grid grid-cols-7 border-b border-gray-200">
+              <div className="grid grid-cols-7 border-b border-gray-200 min-w-[560px]">
                 {dayNames.map(day => (
-                  <div key={day} className="p-3 text-center text-sm font-medium text-gray-700 bg-gray-50">
+                  <div key={day} className="p-2 text-center text-xs sm:text-sm font-medium text-gray-700 bg-gray-50">
                     {day}
                   </div>
                 ))}
               </div>
 
               {/* Calendar Grid */}
-              {view === 'month' ? renderCalendarGrid() : renderWeekGrid()}
+              <div className="min-w-[560px]">
+                {view === 'month' ? renderCalendarGrid() : renderWeekGrid()}
+              </div>
             </div>
           </div>
 
           {/* Side Panel */}
-          <div className="w-80 space-y-6">
+          <div className="w-full lg:w-80 space-y-6">
             {/* Today's Tasks */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Today's Tasks</h3>
