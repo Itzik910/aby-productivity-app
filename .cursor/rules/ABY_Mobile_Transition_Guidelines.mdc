@@ -1,0 +1,19 @@
+# Project Guidelines: Preparation for Future Mobile App Transition
+
+**Context:** This document outlines the core client-side and server-side development constraints for the **ABY Productivity** application. 
+**Objective:** Ensure current Web App development strictly adheres to patterns that will facilitate a seamless future transition to a mobile application (e.g., using a wrapper like Capacitor or a full migration to React Native).
+
+## 1. Strict Separation of Concerns (API-First Architecture)
+* **RESTful Communication:** The client must communicate with the server exclusively via clean REST API calls.
+* **No Server-Side Coupling:** Strictly avoid coupling server logic with view rendering (i.e., do not use rigid Server-Side Rendering (SSR) that limits client flexibility).
+* **JSON Only:** The server acts solely as a data provider (API), returning responses exclusively in JSON format. This ensures any client (Web or Mobile) consumes data uniformly.
+
+## 2. Mobile-First UI/UX Design
+* **Small Screen Optimization:** Design the interface to render and function flawlessly on mobile viewport sizes.
+* **Touch-Friendly Interfaces:** Optimize for touch interactions. Use large, tap-friendly buttons and ensure adequate spacing (margin/padding) to prevent misclicks.
+* **Zero Hover Dependency:** **NEVER** rely on CSS `:hover` states or mouse-over events to reveal critical information, navigation, or core actions, as hover interactions are unavailable on touch devices.
+
+## 3. Client-Side State Management
+* **Centralized State:** Maintain organized and decoupled client-side state management (e.g., utilizing the existing Zustand configuration).
+* **Logic/UI Decoupling:** Enforce a strict architectural boundary between business logic (data fetching, state mutations, persistence) and UI rendering components.
+* **Portability:** This separation ensures that the presentation layer (e.g., React DOM components) can be easily swapped out in the future (e.g., for React Native components) without rewriting the underlying business logic and state management.

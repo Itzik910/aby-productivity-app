@@ -219,6 +219,7 @@ async function getPlaceSuggestions(task, user) {
 
 module.exports = {
   getPlaceSuggestions,
+  searchPlaces,
   derivePlaceKeyword,
   isDIYTask
 };
