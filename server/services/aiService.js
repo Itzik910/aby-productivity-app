@@ -5,6 +5,54 @@ const { getPlaceSuggestions, isDIYTask } = require('./placeService');
 
 let openai = null;
 
+// System prompt for the agentic task parser (English keys, Hebrew values).
+const ABY_AGENT_SYSTEM_PROMPT = `SYSTEM PROMPT: ABY - AI PRODUCTIVITY AGENT
+
+General Instruction: You are a smart personal assistant named ABY. Your task is to receive a user prompt (which may contain a single task or multiple tasks), analyze it, and generate an array of structured task documents using a strict JSON Schema. For each task, define categories, priorities, and generate 2-3 operational Call to Action (CTA) suggestions with dynamic deep links.
+
+Important JSON formatting rule: All JSON keys must be in English, but the actual text content/values (titles, descriptions, summaries, badges) MUST be in Hebrew.
+
+Part 1: The Tag Hierarchy and Categories
+A. [Category: ACTIONABLE] – Tasks requiring a purchase, service, or visiting a business.
+- Tag: PURCHASE_PRODUCT (e.g., buy flowers, paint). -> deepLink expectation: Direct shopping link (e.g., Zer4U, KSP, ZAP).
+- Tag: PURCHASE_SERVICE (e.g., tire replacement, painting). -> deepLink expectation: Google Maps / Waze business search link.
+
+B. [Category: FOCUS] – Tasks requiring concentration, time, and a quiet location.
+- Tag: EDUCATION_STUDY (e.g., study for an exam). -> deepLink expectation: Timer app link, nearby library (Maps).
+- Tag: WORK_PROJECT (e.g., writing code). -> deepLink expectation: Focus playlist (Spotify), focus app.
+
+C. [Category: OUTING] – Tasks requiring leaving the house, navigation, and leisure.
+- Tag: LEISURE_ACTIVITY (e.g., amusement park, movie). -> deepLink expectation: Direct navigation link (Waze/Google Maps).
+- Tag: EXERCISE_HEALTH (e.g., workout). -> deepLink expectation: Workout playlist (Spotify), nearby park (Maps).
+
+D. [Category: ADMIN] – Bureaucratic, phone, or coordination tasks.
+- Tag: MAKE_CALL (e.g., schedule an appointment). -> deepLink expectation: Direct dial link (tel:).
+- Tag: PAY_BILL (e.g., pay water bill). -> deepLink expectation: Official payment website.
+
+Part 2: Dynamic CTA Generation & Deep Links
+1. Tool Calling: Use your search tools to find real data, current prices, and direct links for the 2-3 CTA options.
+2. Link Structure: Ensure every link returned in the "deepLink" field is a functional Direct/Deep Link.
+3. Summarization: Condense the most important information (price, branch, benefit) into the "storedSummary" field concisely.
+4. Location Intent: Include relevant English tags in a "locationIntent" field to assist the classic Node.js backend in future offline Google Places API searches.
+
+OUTPUT SCHEMA: Return ONLY a valid JSON object of the shape:
+{
+  "tasks": [
+    {
+      "title": "<Hebrew string>",
+      "description": "<Hebrew string, optional>",
+      "category": "ACTIONABLE | FOCUS | OUTING | ADMIN",
+      "priority": "low | medium | high | urgent",
+      "tags": ["<ENGLISH_TAG_FROM_HIERARCHY>"],
+      "storedSummary": "<Hebrew string, concise>",
+      "locationIntent": ["<english place-search hints>"],
+      "actionLinks": [
+        { "title": "<Hebrew CTA label>", "deepLink": "<functional url or tel: link>", "badge": "<Hebrew short badge>" }
+      ]
+    }
+  ]
+}`;
+
 console.log('🔍 [AI SERVICE DEBUG] Checking OpenAI API Key...');
 if (process.env.OPENAI_API_KEY) {
   const OpenAI = require('openai');
@@ -651,6 +699,106 @@ INPUT: "${text.replace(/"/g, '\\"')}"`;
       category: 'personal',
       description: '',
     };
+  }
+
+  /**
+   * Parse a free-text prompt into an array of structured agentic tasks.
+   * Emits progress messages via onChunk('progress', message) at milestones.
+   * @param {string} userPrompt - raw free-text prompt from the user
+   * @param {(event: string, message: string) => void} onChunk - progress callback
+   * @param {string} [userContext] - dynamic user-profile context string to inject
+   * @returns {Promise<Array>} normalized task objects
+   */
+  async streamParseTasks(userPrompt, onChunk = () => {}, userContext = '') {
+    const prompt = String(userPrompt || '').trim();
+    if (!prompt) return [];
+
+    // Inject dynamic user context ahead of the base system prompt so the model
+    // knows exactly who it is generating cards for.
+    const systemContent = userContext
+      ? `${userContext}\n\n${ABY_AGENT_SYSTEM_PROMPT}`
+      : ABY_AGENT_SYSTEM_PROMPT;
+
+    if (!openai) {
+      onChunk('progress', 'מחפש מחירים והצעות בקרבת מקום...');
+      return this._streamParseFallback(prompt);
+    }
+
+    try {
+      onChunk('progress', 'מחפש מחירים והצעות בקרבת מקום...');
+
+      const stream = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        stream: true,
+        response_format: { type: 'json_object' },
+        temperature: 0.4,
+        max_tokens: 2000,
+        messages: [
+          { role: 'system', content: systemContent },
+          { role: 'user', content: prompt }
+        ]
+      });
+
+      let content = '';
+      for await (const part of stream) {
+        content += part.choices?.[0]?.delta?.content || '';
+      }
+
+      const parsed = this.parseJsonResponse(content);
+      const tasks = Array.isArray(parsed) ? parsed : (parsed.tasks || []);
+      return tasks.map((t) => this._normalizeAgentTask(t));
+    } catch (error) {
+      console.error('streamParseTasks error:', error.message);
+      return this._streamParseFallback(prompt);
+    }
+  }
+
+  _normalizeAgentTask(task = {}) {
+    const validCategories = ['ACTIONABLE', 'FOCUS', 'OUTING', 'ADMIN'];
+    const validPriorities = ['low', 'medium', 'high', 'urgent'];
+    const category = validCategories.includes(task.category) ? task.category : 'ACTIONABLE';
+    const priority = validPriorities.includes(task.priority) ? task.priority : 'medium';
+
+    return {
+      title: String(task.title || 'משימה חדשה').slice(0, 200),
+      description: task.description ? String(task.description).slice(0, 1000) : '',
+      category,
+      priority,
+      tags: Array.isArray(task.tags) ? task.tags.filter(Boolean) : [],
+      storedSummary: task.storedSummary ? String(task.storedSummary).slice(0, 500) : '',
+      locationIntent: task.locationIntent || [],
+      actionLinks: Array.isArray(task.actionLinks)
+        ? task.actionLinks
+            .filter((l) => l && (l.title || l.deepLink))
+            .map((l) => ({
+              title: String(l.title || '').slice(0, 100),
+              deepLink: String(l.deepLink || ''),
+              badge: l.badge ? String(l.badge).slice(0, 40) : ''
+            }))
+        : []
+    };
+  }
+
+  _streamParseFallback(prompt) {
+    // Split on common Hebrew/English separators so multi-task prompts still yield
+    // multiple cards even without an LLM available.
+    const chunks = prompt
+      .split(/\s*(?:,|;|\band\b|\bו\b|\n)\s*/i)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 5);
+
+    const parts = chunks.length ? chunks : [prompt];
+    return parts.map((title) => ({
+      title: title.slice(0, 200),
+      description: '',
+      category: 'ACTIONABLE',
+      priority: 'medium',
+      tags: [],
+      storedSummary: '',
+      locationIntent: [],
+      actionLinks: []
+    }));
   }
 
   async getStepHint(task, step) {

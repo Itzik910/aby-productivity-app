@@ -46,6 +46,7 @@ const { initializeDataRetention } = require('./services/dataRetentionService');
 const { isPushConfigured } = require('./services/pushNotificationService');
 const { initRecurringTaskScheduler } = require('./services/recurringTaskService');
 const { initNotificationScheduler } = require('./services/notificationScheduler');
+const { initGeofenceScheduler } = require('./services/geofenceService');
 
 const app = express();
 const server = http.createServer(app);
@@ -68,6 +69,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/aby-produ
   initializeDataRetention();
   initRecurringTaskScheduler();
   initNotificationScheduler(io);
+  initGeofenceScheduler(io);
 })
 .catch(err => {
   console.error('❌ MongoDB connection error:', err);

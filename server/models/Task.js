@@ -22,7 +22,12 @@ const taskSchema = new mongoose.Schema({
   // Task Details
   category: {
     type: String,
-    enum: ['work', 'personal', 'health', 'learning', 'social', 'finance', 'home', 'other'],
+    enum: [
+      // Agentic intent categories
+      'ACTIONABLE', 'FOCUS', 'OUTING', 'ADMIN',
+      // Legacy CRUD categories (kept for backward compatibility)
+      'work', 'personal', 'health', 'learning', 'social', 'finance', 'home', 'other'
+    ],
     default: 'personal'
   },
   priority: {
@@ -32,7 +37,7 @@ const taskSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'in_progress', 'completed', 'cancelled', 'archived'],
+    enum: ['open', 'pending', 'in_progress', 'completed', 'cancelled', 'archived'],
     default: 'pending'
   },
   
@@ -130,6 +135,26 @@ const taskSchema = new mongoose.Schema({
       default: 'neutral'
     }
   }],
+
+  // Agentic / Intent-Driven fields
+  actionLinks: [{
+    title: String,
+    deepLink: String,
+    badge: String
+  }],
+  locationIntent: {
+    // String or [String] hints for classic Google Places searches
+    type: mongoose.Schema.Types.Mixed
+  },
+  displayOnMain: {
+    type: Boolean,
+    default: true
+  },
+  storedSummary: {
+    type: String,
+    trim: true,
+    maxlength: [500, 'Stored summary cannot exceed 500 characters']
+  },
   
   // Steps & Subtasks
   steps: [{
@@ -292,6 +317,7 @@ const taskSchema = new mongoose.Schema({
 taskSchema.index({ user: 1, dueDate: 1 });
 taskSchema.index({ user: 1, status: 1 });
 taskSchema.index({ user: 1, category: 1 });
+taskSchema.index({ user: 1, displayOnMain: 1, status: 1 });
 taskSchema.index({ 'location.coordinates': '2dsphere' });
 taskSchema.index({ dueDate: 1 });
 taskSchema.index({ isRecurring: 1, 'recurrence.endDate': 1 });
@@ -353,7 +379,7 @@ taskSchema.statics.findNearby = function(coordinates, maxDistance = 5000) {
         $maxDistance: maxDistance
       }
     },
-    status: { $in: ['pending', 'in_progress'] }
+    status: { $in: ['open', 'pending', 'in_progress'] }
   });
 };
 

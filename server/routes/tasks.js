@@ -4,8 +4,91 @@ const Task = require('../models/Task');
 const User = require('../models/User');
 const AIUsage = require('../models/AIUsage');
 const { auth } = require('../middleware/auth');
+const { checkAIUsageLimit } = require('../middleware/aiLimits');
 const { aiService } = require('../services/aiService');
 const { spawnNextOccurrence } = require('../services/recurringTaskService');
+const { extractAndSavePreferences } = require('../services/preferenceExtractor');
+
+// Build a compact user-profile context string to inject into the AI parser.
+function buildUserContext(user) {
+  if (!user) return '';
+  const p = user.dynamicPreferences || {};
+  const parts = [];
+  const city = p.city || user.location?.city;
+  if (city) parts.push(`City: ${city}`);
+  if (p.sports?.length) parts.push(`Likes Sports: ${p.sports.join(', ')}`);
+  if (p.dislikedSports?.length) parts.push(`Dislikes Sports: ${p.dislikedSports.join(', ')}`);
+  const dietary = [...(p.dietary || []), ...(user.profile?.dietaryRestrictions || [])];
+  if (dietary.length) parts.push(`Dietary: ${[...new Set(dietary)].join(', ')}`);
+  if (p.preferredBrands?.length) parts.push(`Preferred Brands: ${p.preferredBrands.join(', ')}`);
+  if (p.generalNotes?.length) parts.push(`Notes: ${p.generalNotes.join('; ')}`);
+  return parts.length ? `User Profile Context: ${parts.join(' | ')}` : '';
+}
+
+// POST /api/tasks/ai-parse  (Server-Sent Events)
+// Parses a free-text prompt into structured tasks, streaming progress updates.
+router.post('/ai-parse', auth, checkAIUsageLimit, async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  const send = (event, data) => {
+    res.write(`event: ${event}\n`);
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+    if (typeof res.flush === 'function') res.flush();
+  };
+
+  try {
+    const prompt = (req.body && req.body.prompt ? String(req.body.prompt) : '').trim();
+    if (!prompt) {
+      send('error', { message: 'Prompt is required' });
+      return res.end();
+    }
+
+    // Fire-and-forget: learn preferences from this prompt without blocking the stream.
+    extractAndSavePreferences(prompt, req.user._id).catch((err) =>
+      console.error('extractAndSavePreferences (background) failed:', err.message)
+    );
+
+    // Inject dynamic user context so the AI tailors recommendations.
+    const userContext = buildUserContext(req.user);
+
+    send('progress', { message: 'מעבד משימות...' });
+
+    const parsed = await aiService.streamParseTasks(
+      prompt,
+      (event, message) => send(event, { message }),
+      userContext
+    );
+
+    if (!parsed.length) {
+      send('error', { message: 'לא נמצאו משימות בטקסט' });
+      return res.end();
+    }
+
+    // Persist parsed tasks with status 'open' and displayOnMain true before success.
+    const now = new Date();
+    const defaultDueDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const saved = await Task.insertMany(
+      parsed.map((t) => ({
+        ...t,
+        user: req.user._id,
+        status: 'open',
+        displayOnMain: true,
+        dueDate: t.dueDate ? new Date(t.dueDate) : defaultDueDate
+      }))
+    );
+
+    send('success', { tasks: saved });
+    return res.end();
+  } catch (error) {
+    console.error('ai-parse SSE error:', error.message);
+    send('error', { message: error.message || 'Failed to parse tasks' });
+    return res.end();
+  }
+});
 
 // Get all tasks for user with filtering and pagination
 router.get('/', auth, async (req, res) => {

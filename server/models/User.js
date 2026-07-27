@@ -146,6 +146,17 @@ const userSchema = new mongoose.Schema({
       shareAchievements: { type: Boolean, default: true }
     }
   },
+
+  // Dynamic User Memory — preferences learned from free-text prompts.
+  // Arrays are updated with $addToSet to prevent duplicates.
+  dynamicPreferences: {
+    city: { type: String },
+    sports: [{ type: String }],
+    dislikedSports: [{ type: String }],
+    dietary: [{ type: String }],
+    preferredBrands: [{ type: String }],
+    generalNotes: [{ type: String }]
+  },
   
   // Premium Status (replaces Stripe subscription)
   premium: {
