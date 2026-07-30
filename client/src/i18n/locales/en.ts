@@ -265,6 +265,7 @@ const en = {
       askTitle: 'Ask ABY',
       tryExample: 'Try an example',
       exampleText: 'book the car in for a service this week and grab the dry cleaning on the way',
+      todayNote: "Defaults to today unless you mention a date",
       abyOn: 'ABY is on it',
       bgNote: "You can close this — we'll finish in the background",
       due: 'DUE',

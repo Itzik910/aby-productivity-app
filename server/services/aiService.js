@@ -682,9 +682,9 @@ INPUT: "${text.replace(/"/g, '\\"')}"`;
   }
 
   _nlpFallback(text) {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const dueDateStr = tomorrow.toISOString().split('T')[0];
+    // Default to today, not tomorrow — a task is for today unless the text
+    // says otherwise.
+    const dueDateStr = new Date().toISOString().split('T')[0];
 
     const isUrgent = /urgent|asap|immediately|now/i.test(text);
     const isHigh = /important|critical|must|today/i.test(text);

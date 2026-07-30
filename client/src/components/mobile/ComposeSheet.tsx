@@ -82,6 +82,7 @@ const ComposeSheet: React.FC = () => {
               rows={3}
               className="w-full resize-none rounded-2xl border border-aby-line bg-aby-page p-3.5 text-[15px] font-medium text-aby-ink outline-none dark:border-aby-line-dark dark:bg-aby-page-dark dark:text-aby-ink-dark"
             />
+            <p className="mt-2 text-xs font-medium text-aby-muted dark:text-aby-muted-dark">{t('mobile.sheet.todayNote')}</p>
             {error && <p className="mt-2 text-sm font-medium text-red-500">{error}</p>}
             <div className="my-3 flex flex-wrap gap-2">
               <button
