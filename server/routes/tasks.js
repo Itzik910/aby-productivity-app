@@ -69,8 +69,11 @@ router.post('/ai-parse', auth, checkAIUsageLimit, async (req, res) => {
     }
 
     // Persist parsed tasks with status 'open' and displayOnMain true before success.
+    // Tasks are for today unless the parser found an explicit date — this is
+    // what "add a task" means to a user, and it's also what the mobile
+    // Today tab (which only shows tasks due today) expects.
     const now = new Date();
-    const defaultDueDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const defaultDueDate = now;
     const saved = await Task.insertMany(
       parsed.map((t) => ({
         ...t,
