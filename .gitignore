@@ -135,4 +135,7 @@ playwright-report/
 test-results.xml
 
 # Local development
-.local 
+.local
+
+# Claude Code local session settings (machine/session-specific)
+.claude/settings.local.json

@@ -26,6 +26,7 @@ import {
 import { useAuthStore } from '../stores/authStore';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 
 interface Challenge {
   _id: string;
@@ -93,6 +94,7 @@ interface LeaderboardEntry {
 }
 
 const ChallengesPage: React.FC = () => {
+  const { t } = useTranslation();
   const { user } = useAuthStore();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [featuredChallenges, setFeaturedChallenges] = useState<Challenge[]>([]);
@@ -402,7 +404,66 @@ const ChallengesPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 pt-12">
+    <>
+      {/* ---------- Mobile card layout ---------- */}
+      <div className="min-h-screen bg-aby-page pb-24 dark:bg-aby-page-dark md:hidden">
+        <div className="px-5 pt-4">
+          <h1 className="text-[21px] font-extrabold text-aby-ink dark:text-aby-ink-dark">{t('mobile.challenges.title')}</h1>
+          <p className="mt-1.5 text-[13px] font-medium text-aby-sub dark:text-aby-sub-dark">{t('mobile.challenges.intro')}</p>
+
+          <div className="mt-4 flex flex-col gap-3">
+            {getFilteredChallenges().map((challenge) => {
+              const joined = !!challenge.userParticipation;
+              const progress = challenge.userParticipation?.progress?.completionRate || 0;
+              const difficultyInfo = getDifficultyInfo(challenge.difficulty);
+              const reward = challenge.rewards?.prizes?.[0]?.title || `${challenge.rewards?.points?.completion || 0} pts`;
+              const daysLeft = getDaysRemaining(challenge.endDate);
+              return (
+                <div key={challenge._id} className="rounded-[20px] border border-aby-line bg-aby-card p-4 dark:border-aby-line-dark dark:bg-aby-card-dark">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-base font-extrabold leading-snug text-aby-ink dark:text-aby-ink-dark">{challenge.title}</p>
+                      <p className="mt-1 text-xs font-bold text-aby-teal dark:text-[#2FD3CE]">{challenge.sponsor?.name}</p>
+                    </div>
+                    <button
+                      onClick={() => (joined ? leaveChallenge(challenge._id) : joinChallenge(challenge._id))}
+                      className={`h-10 shrink-0 rounded-[13px] px-4 text-[13px] font-bold ${
+                        joined
+                          ? 'border border-aby-line bg-aby-card text-aby-sub dark:border-aby-line-dark dark:text-aby-sub-dark'
+                          : 'bg-aby-ink text-white dark:bg-white dark:text-aby-ink'
+                      }`}
+                    >
+                      {joined ? t('mobile.challenges.joined') : t('mobile.challenges.join')}
+                    </button>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    <span className="rounded-[9px] bg-aby-page px-2.5 py-1 text-[11.5px] font-semibold text-aby-sub dark:bg-aby-page-dark dark:text-aby-sub-dark">
+                      {difficultyInfo.label} · {challenge.currentParticipants}
+                    </span>
+                    <span className="rounded-[9px] bg-[#FEF3C7] px-2.5 py-1 text-[11.5px] font-bold text-[#A15C07]">{reward}</span>
+                    <span className="rounded-[9px] bg-aby-page px-2.5 py-1 text-[11.5px] font-semibold text-aby-sub dark:bg-aby-page-dark dark:text-aby-sub-dark">
+                      {daysLeft > 0 ? `${daysLeft}d left` : 'Ending'}
+                    </span>
+                  </div>
+                  {joined && (
+                    <div className="mt-3 flex items-center gap-2.5">
+                      <div className="h-[7px] flex-1 rounded-full bg-[#EFECF7]">
+                        <div className="h-[7px] rounded-full bg-aby-violet" style={{ width: `${progress}%` }} />
+                      </div>
+                      <span className="text-[11.5px] font-bold text-aby-sub dark:text-aby-sub-dark">
+                        {t('mobile.challenges.pctComplete', { pct: Math.round(progress) })}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* ---------- Desktop layout (unchanged) ---------- */}
+      <div className="hidden min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 pt-12 md:block">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
@@ -725,7 +786,8 @@ const ChallengesPage: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+      </div>
+    </>
   );
 };
 

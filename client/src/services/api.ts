@@ -12,13 +12,62 @@ export const api = axios.create({
 // Prevent concurrent refresh calls — one promise shared across all waiters
 let refreshPromise: Promise<void> | null = null;
 
-function forceLogout() {
+export function forceLogout() {
   localStorage.removeItem('auth-storage');
   // Clear the Authorization header so no further requests carry the bad token
   delete api.defaults.headers.common['Authorization'];
   // Notify the rest of the app via a custom event so the Zustand auth store
   // can clear its in-memory state without creating a circular import.
   window.dispatchEvent(new CustomEvent('aby:force-logout'));
+}
+
+/**
+ * Refreshes the access token using the stored refresh token, persists the
+ * new tokens, and returns the new access token. Shares the same dedup
+ * promise as the axios response interceptor below, so a raw `fetch()` call
+ * (which can't go through that interceptor — see useTaskStream.ts) and a
+ * concurrent axios 401 both trigger at most one refresh request.
+ */
+export function refreshAuthToken(): Promise<string> {
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      const raw = localStorage.getItem('auth-storage');
+      if (!raw) throw new Error('No stored credentials');
+
+      const authData = JSON.parse(raw);
+      const storedRefreshToken = authData.state?.refreshToken;
+      if (!storedRefreshToken) throw new Error('No refresh token');
+
+      const response = await axios.post(
+        `${api.defaults.baseURL}/auth/refresh`,
+        { refreshToken: storedRefreshToken },
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+
+      const { token: newToken, refreshToken: newRefreshToken } = response.data.data;
+
+      // Persist updated tokens
+      const updatedAuthData = {
+        ...authData,
+        state: {
+          ...authData.state,
+          token: newToken,
+          refreshToken: newRefreshToken,
+        },
+      };
+      localStorage.setItem('auth-storage', JSON.stringify(updatedAuthData));
+      api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+    })().finally(() => {
+      refreshPromise = null;
+    });
+  }
+
+  return refreshPromise.then(() => {
+    const raw = localStorage.getItem('auth-storage');
+    const token = raw ? JSON.parse(raw).state?.token : null;
+    if (!token) throw new Error('Refresh did not yield a token');
+    return token;
+  });
 }
 
 // Request interceptor — attach current token from localStorage
@@ -56,50 +105,9 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
-      // Deduplicate concurrent refresh calls
-      if (!refreshPromise) {
-        refreshPromise = (async () => {
-          const raw = localStorage.getItem('auth-storage');
-          if (!raw) throw new Error('No stored credentials');
-
-          const authData = JSON.parse(raw);
-          const storedRefreshToken = authData.state?.refreshToken;
-          if (!storedRefreshToken) throw new Error('No refresh token');
-
-          const response = await axios.post(
-            `${api.defaults.baseURL}/auth/refresh`,
-            { refreshToken: storedRefreshToken },
-            { headers: { 'Content-Type': 'application/json' } }
-          );
-
-          const { token: newToken, refreshToken: newRefreshToken } = response.data.data;
-
-          // Persist updated tokens
-          const updatedAuthData = {
-            ...authData,
-            state: {
-              ...authData.state,
-              token: newToken,
-              refreshToken: newRefreshToken,
-            },
-          };
-          localStorage.setItem('auth-storage', JSON.stringify(updatedAuthData));
-          api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-        })().finally(() => {
-          refreshPromise = null;
-        });
-      }
-
       try {
-        await refreshPromise;
-        // Re-attach the new token and retry
-        const raw = localStorage.getItem('auth-storage');
-        if (raw) {
-          const { state } = JSON.parse(raw);
-          if (state?.token) {
-            originalRequest.headers.Authorization = `Bearer ${state.token}`;
-          }
-        }
+        const newToken = await refreshAuthToken();
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return api(originalRequest);
       } catch {
         forceLogout();

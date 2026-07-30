@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { 
-  Award, 
-  Trophy, 
-  Star, 
-  Target, 
-  Zap, 
-  Clock, 
-  CheckCircle, 
+import {
+  Award,
+  Trophy,
+  Star,
+  Target,
+  Zap,
+  Clock,
+  CheckCircle,
   TrendingUp,
   Calendar,
   Users,
@@ -15,6 +15,20 @@ import {
   Crown,
   Lock
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+
+const TIER_STYLE: Record<string, string> = {
+  bronze: '#B4531A',
+  silver: '#5A6172',
+  gold: '#A15C07',
+  platinum: '#7E22CE',
+};
+const TIER_BG: Record<string, string> = {
+  bronze: '#FDF0E6',
+  silver: '#F1F2F5',
+  gold: '#FEF3C7',
+  platinum: '#F3E8FF',
+};
 
 interface Achievement {
   id: string;
@@ -32,6 +46,7 @@ interface Achievement {
 }
 
 const AchievementsPage: React.FC = () => {
+  const { t } = useTranslation();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [userStats] = useState({
     totalXP: 2450,
@@ -211,8 +226,86 @@ const AchievementsPage: React.FC = () => {
     return (progress / maxProgress) * 100;
   };
 
+  const rankedByProgress = [...achievements].sort(
+    (a, b) => b.progress / b.maxProgress - a.progress / a.maxProgress
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6 pt-14">
+    <>
+      {/* ---------- Mobile card layout ---------- */}
+      <div className="min-h-screen bg-aby-page pb-24 dark:bg-aby-page-dark md:hidden">
+        <div className="px-5 pt-4">
+          <h1 className="text-[21px] font-extrabold text-aby-ink dark:text-aby-ink-dark">{t('mobile.achievements.title')}</h1>
+
+          <div className="mt-4 rounded-[20px] p-[18px] text-white" style={{ background: 'linear-gradient(135deg,#5B4BE0,#4436C6)' }}>
+            <div className="flex items-end justify-between">
+              <div>
+                <div className="text-xs font-semibold text-white/70">{t('mobile.achievements.level')}</div>
+                <div className="mt-1 text-[34px] font-extrabold leading-none">{userStats.level}</div>
+              </div>
+              <div className="text-end">
+                <div className="text-lg font-extrabold">{userStats.totalXP.toLocaleString()} XP</div>
+                <div className="mt-0.5 text-xs font-semibold text-white/70">
+                  {t('mobile.achievements.xpToNext', { n: userStats.xpToNextLevel, level: userStats.level + 1 })}
+                </div>
+              </div>
+            </div>
+            <div className="mt-3.5 h-[9px] rounded-full bg-white/20">
+              <div className="h-[9px] rounded-full bg-[#7BF1A8]" style={{ width: `${getLevelProgress()}%` }} />
+            </div>
+            <div className="mt-3 text-[12.5px] font-semibold text-white/80">
+              {t('mobile.achievements.unlockedLine', {
+                unlocked: userStats.unlockedAchievements,
+                total: userStats.totalAchievements,
+                pct: Math.round((userStats.unlockedAchievements / userStats.totalAchievements) * 100),
+              })}
+            </div>
+          </div>
+
+          <div className="mb-2.5 mt-6 text-[11px] font-extrabold tracking-wide text-aby-muted dark:text-aby-muted-dark">
+            {t('mobile.achievements.almost')}
+          </div>
+          <div className="flex flex-col gap-2.5">
+            {rankedByProgress.map((a) => (
+              <div key={a.id} className="rounded-[18px] border border-aby-line bg-aby-card p-3.5 dark:border-aby-line-dark dark:bg-aby-card-dark">
+                <div className="flex items-start gap-3">
+                  <span
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
+                    style={{ background: a.unlocked ? '#EDE8FE' : '#F3F1FA' }}
+                  >
+                    {a.unlocked ? <span className="text-aby-violet dark:text-aby-violet-dark">{a.icon}</span> : <Lock className="h-[19px] w-[19px] text-aby-muted" />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className={`text-[15px] font-bold ${a.unlocked ? 'text-aby-ink dark:text-aby-ink-dark' : 'text-[#4A4460]'}`}>{a.title}</p>
+                      <span
+                        className="rounded-[7px] px-2 py-0.5 text-[10.5px] font-bold"
+                        style={{ background: TIER_BG[a.difficulty], color: TIER_STYLE[a.difficulty] }}
+                      >
+                        {a.difficulty}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-xs font-medium text-aby-muted dark:text-aby-muted-dark">{a.description}</p>
+                  </div>
+                  <span className="shrink-0 text-xs font-bold text-aby-violet dark:text-aby-violet-dark">+{a.xpReward} XP</span>
+                </div>
+                <div className="mt-3 flex items-center gap-2.5">
+                  <div className="h-[7px] flex-1 rounded-full bg-[#EFECF7]">
+                    <div
+                      className="h-[7px] rounded-full"
+                      style={{ width: `${getProgressPercentage(a.progress, a.maxProgress)}%`, background: a.unlocked ? '#22C55E' : '#5B4BE0' }}
+                    />
+                  </div>
+                  <span className="text-[11.5px] font-bold text-aby-sub dark:text-aby-sub-dark">{a.progress} / {a.maxProgress}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ---------- Desktop layout (unchanged) ---------- */}
+      <div className="hidden min-h-screen bg-gray-50 p-6 pt-14 md:block">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -443,8 +536,9 @@ const AchievementsPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 
-export default AchievementsPage; 
+export default AchievementsPage;

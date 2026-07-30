@@ -1,9 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../stores/authStore';
-import { Eye, EyeOff, Mail, Lock, User, Briefcase, MapPin, UserPlus, ArrowLeft, Info } from 'lucide-react';
+import { useOnboardingStore } from '../stores/onboardingStore';
+import { Eye, EyeOff, Mail, Lock, User, Briefcase, MapPin, UserPlus, ArrowLeft, ChevronLeft, Info } from 'lucide-react';
+import MobileAuthShell from '../components/mobile/MobileAuthShell';
 
 const RegisterPage: React.FC = () => {
+  const { t } = useTranslation();
+  const [mobileName, setMobileName] = useState('');
+  const [mobileEmail, setMobileEmail] = useState('');
+  const [mobilePassword, setMobilePassword] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -21,7 +28,19 @@ const RegisterPage: React.FC = () => {
   const [worksFromHome, setWorksFromHome] = useState(false);
   
   const { register, isLoading, error, isAuthenticated } = useAuthStore();
+  const maybeAutoStart = useOnboardingStore((s) => s.maybeAutoStart);
   const navigate = useNavigate();
+
+  const handleMobileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await register({ name: mobileName, email: mobileEmail, password: mobilePassword });
+      maybeAutoStart();
+      navigate('/dashboard');
+    } catch {
+      // authStore.error already surfaces the message.
+    }
+  };
 
   useEffect(() => {
     if (error) {
@@ -163,7 +182,80 @@ const RegisterPage: React.FC = () => {
   );
 
   return (
-    <div className="auth-page min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-cyan-50 flex items-center justify-center p-4">
+    <>
+      <MobileAuthShell>
+        <button
+          onClick={() => navigate('/')}
+          className="flex h-[42px] w-[42px] items-center justify-center rounded-2xl border border-white/[.18] text-white"
+        >
+          <ChevronLeft className="rtl-flip h-[18px] w-[18px]" />
+        </button>
+        <h1 className="mt-5 text-[26px] font-extrabold text-white">{t('mobile.auth.signupTitle')}</h1>
+        <p className="mt-2 text-sm text-white/60">{t('mobile.auth.signupSub')}</p>
+        <form onSubmit={handleMobileSubmit} className="mt-6 flex flex-col gap-3.5">
+          {error && <p className="text-sm font-medium text-red-300">{error}</p>}
+          <label className="block">
+            <span className="mb-1.5 block text-[11px] font-bold tracking-wide text-white/55">{t('mobile.auth.fullName')}</span>
+            <input
+              type="text"
+              value={mobileName}
+              onChange={(e) => setMobileName(e.target.value)}
+              disabled={isLoading}
+              className="h-[52px] w-full rounded-2xl border border-white/[.16] bg-white/[.07] px-4 text-[15px] font-medium text-white outline-none"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-[11px] font-bold tracking-wide text-white/55">{t('mobile.auth.email')}</span>
+            <input
+              type="email"
+              value={mobileEmail}
+              onChange={(e) => setMobileEmail(e.target.value)}
+              disabled={isLoading}
+              className="h-[52px] w-full rounded-2xl border border-white/[.16] bg-white/[.07] px-4 text-[15px] font-medium text-white outline-none"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-[11px] font-bold tracking-wide text-white/55">{t('mobile.auth.password')}</span>
+            <input
+              type="password"
+              value={mobilePassword}
+              onChange={(e) => setMobilePassword(e.target.value)}
+              disabled={isLoading}
+              className="h-[52px] w-full rounded-2xl border border-white/[.16] bg-white/[.07] px-4 text-[15px] font-medium text-white outline-none"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="mt-1 flex h-14 w-full items-center justify-center rounded-2xl text-[16px] font-extrabold text-white shadow-[0_16px_34px_-16px_rgba(124,92,255,.9)] disabled:opacity-60"
+            style={{ background: 'linear-gradient(135deg,#7C5CFF,#4436C6)' }}
+          >
+            {isLoading ? '…' : t('mobile.auth.signupCta')}
+          </button>
+          <div className="my-0.5 flex items-center gap-3">
+            <span className="h-px flex-1 bg-white/[.14]" />
+            <span className="text-[11.5px] font-semibold text-white/45">{t('mobile.auth.or')}</span>
+            <span className="h-px flex-1 bg-white/[.14]" />
+          </div>
+          <button
+            type="button"
+            onClick={handleMobileSubmit}
+            className="h-[50px] w-full rounded-2xl bg-white text-sm font-bold text-aby-ink"
+          >
+            {t('mobile.auth.apple')}
+          </button>
+          <button
+            type="button"
+            onClick={handleMobileSubmit}
+            className="h-[50px] w-full rounded-2xl border border-white/[.18] text-sm font-bold text-white"
+          >
+            {t('mobile.auth.google')}
+          </button>
+          <p className="mt-1 text-center text-[11.5px] leading-relaxed text-white/40">{t('mobile.auth.signupTerms')}</p>
+        </form>
+      </MobileAuthShell>
+
+      <div className="hidden md:flex auth-page min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-cyan-50 items-center justify-center p-4">
       <div className="max-w-md w-full">
         {/* Header */}
         <div className="text-center mb-8">
@@ -567,8 +659,9 @@ const RegisterPage: React.FC = () => {
           </Link>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 
-export default RegisterPage; 
+export default RegisterPage;

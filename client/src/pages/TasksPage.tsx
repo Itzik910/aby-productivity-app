@@ -28,6 +28,8 @@ import {
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
 import { useTaskModalStore } from '../stores/taskModalStore';
+import MobileTasksView from '../components/mobile/MobileTasksView';
+import { MobileTask, isTaskDone } from '../utils/taskDisplay';
 
 interface AISuggestion {
   header: string;
@@ -264,6 +266,22 @@ const TasksPage: React.FC = () => {
     }
   };
 
+  const toggleTaskMobile = async (task: MobileTask) => {
+    const done = isTaskDone(task);
+    setTasks((prev) =>
+      prev.map((x) => (x._id === task._id ? { ...x, status: done ? 'pending' : 'completed' } as Task : x))
+    );
+    try {
+      if (done) {
+        await api.put(`/tasks/${task._id}`, { status: 'pending' });
+      } else {
+        await api.patch(`/tasks/${task._id}/complete`);
+      }
+    } catch {
+      fetchTasks();
+    }
+  };
+
   const deleteTask = async (taskId: string) => {
     try {
       await api.delete(`/tasks/${taskId}`);
@@ -407,7 +425,9 @@ const TasksPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 pt-12">
+    <>
+      <MobileTasksView tasks={tasks as unknown as MobileTask[]} onToggle={toggleTaskMobile} />
+      <div className="hidden min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 pt-12 md:block">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
@@ -1197,7 +1217,8 @@ const TasksPage: React.FC = () => {
         taskTitle={focusTask?.title}
         onClose={() => setFocusTask(null)}
       />
-    </div>
+      </div>
+    </>
   );
 };
 

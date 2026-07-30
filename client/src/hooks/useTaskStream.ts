@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import api from '../services/api';
+import api, { refreshAuthToken, forceLogout } from '../services/api';
 import { useTaskStore, AgentTask } from '../stores/taskStore';
 
 interface SSEEvent {
@@ -66,10 +66,14 @@ export function useTaskStream() {
       setStreamMessage('מעבד משימות...');
 
       const baseURL = api.defaults.baseURL || 'http://localhost:5000/api';
-      const token = getAuthToken();
 
-      try {
-        const res = await fetch(`${baseURL}/tasks/ai-parse`, {
+      // Raw fetch() (needed to consume the SSE body) doesn't go through the
+      // axios `api` instance's 401 → refresh-token → retry interceptor, so
+      // the 15-minute access token expiring would otherwise fail this call
+      // even while every other axios-backed request in the app keeps working
+      // transparently. Mirror that same refresh-once-and-retry behavior here.
+      const doFetch = (token: string | null) =>
+        fetch(`${baseURL}/tasks/ai-parse`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -78,6 +82,19 @@ export function useTaskStream() {
           body: JSON.stringify({ prompt: trimmed }),
           signal: controller.signal,
         });
+
+      try {
+        let res = await doFetch(getAuthToken());
+
+        if (res.status === 401) {
+          try {
+            const newToken = await refreshAuthToken();
+            res = await doFetch(newToken);
+          } catch {
+            forceLogout();
+            throw new Error('Your session expired — please sign in again');
+          }
+        }
 
         if (!res.ok || !res.body) {
           throw new Error(`Request failed with status ${res.status}`);
@@ -103,6 +120,10 @@ export function useTaskStream() {
               const tasks: AgentTask[] = data?.tasks || [];
               addTasks(tasks);
               setStreaming(false);
+              // Same signal CreateTaskModal already dispatches, so any page
+              // listening for it (CalendarPage, and the new mobile Today/
+              // Tasks tabs) refetches and picks up the newly created tasks.
+              window.dispatchEvent(new CustomEvent('taskCreated'));
             } else if (event === 'error') {
               setError(data?.message || 'שגיאה בעיבוד המשימות');
               setStreaming(false);
