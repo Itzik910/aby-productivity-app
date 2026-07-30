@@ -153,6 +153,8 @@ const he = {
       fixTitle: 'סדר לי את היום',
       fixSub: 'לסדר את הסידורים למסלול אחד יעיל',
       empty: 'לא נשאר כלום היום — כל הכבוד.',
+      swipePostpone: 'מחר',
+      swipeComplete: 'בוצע',
     },
     tasks: {
       title: 'משימות',

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { Sparkles, Navigation, Loader2, Check } from 'lucide-react';
+import { Sparkles, Navigation, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
 import { useLanguageStore } from '../stores/languageStore';
 import { useAuthStore } from '../stores/authStore';
@@ -10,8 +10,8 @@ import { useMobileUiStore } from '../stores/mobileUiStore';
 import HeroInput from '../components/HeroInput';
 import TaskCard from '../components/TaskCard';
 import FixMyDayModal from '../components/FixMyDayModal';
-import MobileTaskRow from '../components/mobile/MobileTaskRow';
-import { MobileTask, isSameDay, priorityBadge, formatTaskTime, isTaskDone } from '../utils/taskDisplay';
+import SwipeableTaskRow from '../components/mobile/SwipeableTaskRow';
+import { MobileTask, isSameDay, isTaskDone, groupByCategory, categoryLabel } from '../utils/taskDisplay';
 
 const DashboardPage: React.FC = () => {
   const { t } = useTranslation();
@@ -64,6 +64,21 @@ const DashboardPage: React.FC = () => {
     }
   };
 
+  // Swipe right on a Today row: push it to tomorrow so it naturally drops
+  // off today's list and reappears on tomorrow's Today/Calendar view —
+  // no separate "snoozed" flag needed, it's just the same dueDate filtering
+  // every other mobile screen already uses.
+  const postponeTask = async (task: MobileTask) => {
+    const next = new Date(task.dueDate);
+    next.setDate(next.getDate() + 1);
+    setMobileTasks((prev) => prev.filter((x) => x._id !== task._id));
+    try {
+      await api.put(`/tasks/${task._id}`, { dueDate: next.toISOString() });
+    } catch {
+      fetchMobileTasks();
+    }
+  };
+
   // Load the user's open tasks into the agentic task store (desktop feed).
   useEffect(() => {
     let cancelled = false;
@@ -102,10 +117,8 @@ const DashboardPage: React.FC = () => {
   const totalCount = todayTasks.length;
   const pct = totalCount ? Math.round((doneCount / totalCount) * 100) : 0;
   const openToday = todayTasks.filter((mt) => !isTaskDone(mt));
-  const nowTask = openToday[0];
-  const upNext = openToday.slice(1);
+  const categoryGroups = groupByCategory(openToday);
   const streak = user?.stats?.currentStreak || 0;
-  const nowBadge = nowTask ? priorityBadge(nowTask.priority) : null;
 
   const dateLine = now
     .toLocaleDateString(isRtl ? 'he-IL' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -193,67 +206,30 @@ const DashboardPage: React.FC = () => {
                 </span>
               </div>
 
-              {nowTask ? (
-                <div
-                  data-tour="up-now"
-                  className="rounded-[20px] border border-aby-line bg-aby-card p-4 shadow-sm dark:border-aby-line-dark dark:bg-aby-card-dark"
-                >
-                  <div className="mb-2.5 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="h-[9px] w-[9px] rounded-full bg-indigo-500" />
-                      <span className="text-xs font-bold text-aby-sub dark:text-aby-sub-dark">{nowTask.category}</span>
-                    </div>
-                    <span
-                      className="rounded-lg px-2.5 py-1 text-[11px] font-bold"
-                      style={{ background: nowBadge?.bg, color: nowBadge?.fg }}
-                    >
-                      {t(`tasks.${nowTask.priority}`)}
-                    </span>
-                  </div>
-                  <h3 className="text-lg font-extrabold leading-tight text-aby-ink dark:text-aby-ink-dark">
-                    {nowTask.title}
-                  </h3>
-                  <p className="mt-1 text-[13px] font-medium text-aby-sub dark:text-aby-sub-dark">
-                    {formatTaskTime(nowTask.dueDate)}
-                    {nowTask.estimatedDuration ? ` · ${nowTask.estimatedDuration} min` : ''}
-                  </p>
-                  <div className="mt-3.5 flex gap-2.5">
-                    <button
-                      onClick={() => openDetail(nowTask._id)}
-                      className="h-[50px] flex-1 rounded-2xl bg-aby-violet text-[15px] font-bold text-white"
-                    >
-                      {t('mobile.today.open')}
-                    </button>
-                    <button
-                      onClick={() => toggleTask(nowTask)}
-                      aria-label={t('tasks.complete')}
-                      className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-2xl border border-aby-line text-green-500 dark:border-aby-line-dark"
-                    >
-                      <Check className="h-[22px] w-[22px]" strokeWidth={2.4} />
-                    </button>
-                  </div>
-                </div>
-              ) : (
+              {categoryGroups.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-aby-line py-10 text-center text-sm font-medium text-aby-muted dark:border-aby-line-dark dark:text-aby-muted-dark">
                   {t('mobile.today.empty')}
                 </div>
-              )}
-
-              {upNext.length > 0 && (
-                <div className="pt-5">
-                  <div className="mb-2.5 text-[11px] font-extrabold tracking-wide text-aby-muted dark:text-aby-muted-dark">
-                    {t('mobile.today.then')}
-                  </div>
-                  <div className="flex flex-col gap-2.5">
-                    {upNext.map((mt) => (
-                      <MobileTaskRow
-                        key={mt._id}
-                        task={mt}
-                        onToggle={() => toggleTask(mt)}
-                        onOpen={() => openDetail(mt._id)}
-                      />
-                    ))}
-                  </div>
+              ) : (
+                <div data-tour="up-now" className="flex flex-col gap-5">
+                  {categoryGroups.map((group) => (
+                    <div key={group.category}>
+                      <div className="mb-2.5 text-[11px] font-extrabold tracking-wide text-aby-muted dark:text-aby-muted-dark">
+                        {categoryLabel(group.category)}
+                      </div>
+                      <div className="flex flex-col gap-2.5">
+                        {group.items.map((mt) => (
+                          <SwipeableTaskRow
+                            key={mt._id}
+                            task={mt}
+                            onPostpone={() => postponeTask(mt)}
+                            onComplete={() => toggleTask(mt)}
+                            onOpen={() => openDetail(mt._id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </>
