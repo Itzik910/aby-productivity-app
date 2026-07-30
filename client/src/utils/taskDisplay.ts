@@ -78,3 +78,48 @@ export function formatTaskTime(dateStr: string): string {
 export function isTaskDone(task: MobileTask): boolean {
   return task.status === 'completed';
 }
+
+// Preferred display order: agentic categories first (ACTIONABLE/FOCUS/OUTING/
+// ADMIN, used by AI-parsed tasks), then classic categories (used by manually
+// created tasks). Anything else falls back to first-appearance order.
+const CATEGORY_ORDER = [
+  'ACTIONABLE',
+  'ADMIN',
+  'FOCUS',
+  'OUTING',
+  'work',
+  'personal',
+  'health',
+  'learning',
+  'social',
+  'finance',
+  'home',
+  'other',
+];
+
+export function categoryLabel(category: string): string {
+  return category.length ? category.charAt(0).toUpperCase() + category.slice(1).toLowerCase() : category;
+}
+
+export interface CategoryGroup {
+  category: string;
+  items: MobileTask[];
+}
+
+/** Groups tasks by category, ordered per CATEGORY_ORDER then by first appearance. */
+export function groupByCategory(tasks: MobileTask[]): CategoryGroup[] {
+  const seen: string[] = [];
+  const byCategory = new Map<string, MobileTask[]>();
+  for (const task of tasks) {
+    if (!byCategory.has(task.category)) {
+      byCategory.set(task.category, []);
+      seen.push(task.category);
+    }
+    byCategory.get(task.category)!.push(task);
+  }
+  const ordered = [
+    ...CATEGORY_ORDER.filter((c) => byCategory.has(c)),
+    ...seen.filter((c) => !CATEGORY_ORDER.includes(c)),
+  ];
+  return ordered.map((category) => ({ category, items: byCategory.get(category)! }));
+}

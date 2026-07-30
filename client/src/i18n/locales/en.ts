@@ -153,6 +153,8 @@ const en = {
       fixTitle: 'Fix My Day',
       fixSub: 'Order your errands into one efficient route',
       empty: 'Nothing left today — nice work.',
+      swipePostpone: 'Tomorrow',
+      swipeComplete: 'Done',
     },
     tasks: {
       title: 'Tasks',
