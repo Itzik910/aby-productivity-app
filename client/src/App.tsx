@@ -26,6 +26,12 @@ import CreateTaskModal from './components/CreateTaskModal';
 import TopBar from './components/TopBar';
 import CommandPalette from './components/CommandPalette';
 import NLPTaskModal from './components/NLPTaskModal';
+import MobileTabBar from './components/mobile/MobileTabBar';
+import ComposeSheet from './components/mobile/ComposeSheet';
+import TaskDetailSheet from './components/mobile/TaskDetailSheet';
+import OnboardingTour from './components/mobile/OnboardingTour';
+import YouPage from './pages/YouPage';
+import SettingsPage from './pages/SettingsPage';
 
 // Stores
 import { useAuthStore } from './stores/authStore';
@@ -84,7 +90,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 function App() {
-  const { isLoading, logout } = useAuthStore();
+  const { isLoading, logout, isAuthenticated } = useAuthStore();
   const { theme } = useThemeStore();
   const { isOpen: isTaskModalOpen, initialDate, closeModal } = useTaskModalStore();
   const { isRtl } = useLanguageStore();
@@ -142,8 +148,8 @@ function App() {
       <div className="App">
         <TopBar onOpenCommandPalette={() => setShowCommandPalette(true)} />
         <DashboardButton />
-        <CreateTaskModal 
-          isOpen={isTaskModalOpen} 
+        <CreateTaskModal
+          isOpen={isTaskModalOpen}
           onClose={closeModal}
           initialDate={initialDate}
         />
@@ -156,6 +162,17 @@ function App() {
           isOpen={showNLPModal}
           onClose={() => setShowNLPModal(false)}
         />
+
+        {/* Mobile-only bottom nav + global sheets + onboarding tour */}
+        {isAuthenticated && (
+          <div className="md:hidden">
+            <MobileTabBar />
+            <ComposeSheet />
+            <TaskDetailSheet />
+            <OnboardingTour />
+          </div>
+        )}
+
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<WelcomePage />} />
@@ -177,6 +194,8 @@ function App() {
           <Route path="/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
           <Route path="/achievements" element={<ProtectedRoute><AchievementsPage /></ProtectedRoute>} />
           <Route path="/habits" element={<ProtectedRoute><HabitsPage /></ProtectedRoute>} />
+          <Route path="/you" element={<ProtectedRoute><YouPage /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
           
           {/* Catch all route */}
           <Route path="*" element={

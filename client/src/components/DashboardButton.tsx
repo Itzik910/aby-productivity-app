@@ -21,7 +21,7 @@ const DashboardButton: React.FC = () => {
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
       onClick={() => navigate('/dashboard')}
-      className="fixed top-14 left-6 z-40 flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200"
+      className="fixed top-14 left-6 z-40 hidden md:flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200"
       title="Return to Dashboard"
     >
       <Home className="w-4 h-4" />

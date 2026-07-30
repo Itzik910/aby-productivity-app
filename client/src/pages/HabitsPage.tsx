@@ -4,6 +4,7 @@ import { Plus, Flame, X, Check, Loader2, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
+import { last7Days } from '../utils/habitDisplay';
 
 interface Habit {
   _id: string;
@@ -114,7 +115,84 @@ const HabitsPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-14 pb-20">
+    <>
+      {/* ---------- Mobile card layout ---------- */}
+      <div className="min-h-screen bg-aby-page pb-24 dark:bg-aby-page-dark md:hidden">
+        <div className="px-5 pt-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-[21px] font-extrabold text-aby-ink dark:text-aby-ink-dark">{t('mobile.habits.title')}</h1>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="h-[42px] rounded-2xl bg-aby-violet px-4 text-[13px] font-bold text-white"
+            >
+              {t('mobile.habits.newHabit')}
+            </button>
+          </div>
+
+          {habits.length === 0 ? (
+            <div className="mt-8 rounded-2xl border border-dashed border-aby-line py-14 text-center dark:border-aby-line-dark">
+              <div className="mb-3 text-5xl">🌱</div>
+              <p className="text-sm font-medium text-aby-muted dark:text-aby-muted-dark">{t('mobile.tasks.empty')}</p>
+            </div>
+          ) : (
+            <div className="mt-4 flex flex-col gap-3">
+              {habits.map((habit) => {
+                const doneToday = habit.completedDates.includes(today);
+                return (
+                  <div
+                    key={habit._id}
+                    className="rounded-[20px] border border-aby-line bg-aby-card p-3.5 dark:border-aby-line-dark dark:bg-aby-card-dark"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-2xl text-xl"
+                        style={{ background: `${habit.color}1F` }}
+                      >
+                        {habit.emoji}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[15px] font-bold text-aby-ink dark:text-aby-ink-dark">{habit.title}</p>
+                        <p
+                          className="mt-0.5 text-xs font-semibold"
+                          style={{ color: habit.currentStreak > 0 ? '#EA7C1B' : undefined }}
+                        >
+                          {habit.currentStreak > 0
+                            ? t('mobile.habits.streakBest', { n: habit.currentStreak, best: habit.longestStreak })
+                            : t('mobile.habits.startAgain', { best: habit.longestStreak })}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => toggleToday(habit)}
+                        disabled={togglingId === habit._id}
+                        className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-2xl"
+                        style={
+                          doneToday
+                            ? { background: habit.color, color: '#fff' }
+                            : { border: '2px dashed #DDD8EC', color: '#C9C2E0' }
+                        }
+                      >
+                        <Check className="h-5 w-5" strokeWidth={3} />
+                      </button>
+                    </div>
+                    <div className="mt-3 flex gap-1.5">
+                      {last7Days(habit).map((done, i) => (
+                        <span
+                          key={i}
+                          className="h-[22px] flex-1 rounded-[7px]"
+                          style={{ background: done ? habit.color : '#EFECF7', opacity: done ? 0.9 : 1 }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ---------- Desktop layout (unchanged) ---------- */}
+      <div className="hidden min-h-screen bg-gray-50 pt-14 pb-20 md:block">
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -386,7 +464,8 @@ const HabitsPage: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+      </div>
+    </>
   );
 };
 

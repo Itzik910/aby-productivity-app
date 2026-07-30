@@ -1,19 +1,22 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { 
-  CheckCircle, 
-  Brain, 
-  MapPin, 
-  Calendar, 
-  TrendingUp, 
-  Trophy, 
-  Bell, 
+import { useTranslation } from 'react-i18next';
+import {
+  CheckCircle,
+  Brain,
+  MapPin,
+  Calendar,
+  TrendingUp,
+  Trophy,
+  Bell,
   Users,
   ArrowRight
 } from 'lucide-react';
+import MobileAuthShell from '../components/mobile/MobileAuthShell';
 
 const WelcomePage: React.FC = () => {
+  const { t } = useTranslation();
   const features = [
     {
       icon: <Brain className="w-6 h-6" />,
@@ -55,7 +58,39 @@ const WelcomePage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
+    <>
+      <MobileAuthShell>
+        <div className="flex flex-1 flex-col justify-center py-6">
+          <div className="text-[11px] font-extrabold tracking-[.14em] text-[#A79BFF]">{t('mobile.auth.eyebrow')}</div>
+          <h1 className="mt-3 text-[33px] font-extrabold leading-[1.14] text-white">{t('mobile.auth.headline')}</h1>
+          <p className="mt-3.5 text-[15px] leading-relaxed text-white/70">{t('mobile.auth.sub')}</p>
+          <div className="mt-6 flex flex-col gap-3">
+            {[t('mobile.auth.proof1'), t('mobile.auth.proof2'), t('mobile.auth.proof3')].map((p) => (
+              <div key={p} className="flex items-center gap-3">
+                <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-[rgba(124,92,255,.24)] text-[#C9BEFF]">
+                  <CheckCircle className="h-3.5 w-3.5" />
+                </span>
+                <span className="text-sm font-semibold leading-snug text-white/90">{p}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-col gap-3">
+          <Link
+            to="/register"
+            className="flex h-14 w-full items-center justify-center rounded-2xl text-[16px] font-extrabold text-white shadow-[0_16px_34px_-16px_rgba(124,92,255,.9)]"
+            style={{ background: 'linear-gradient(135deg,#7C5CFF,#4436C6)' }}
+          >
+            {t('mobile.auth.startCta')}
+          </Link>
+          <Link to="/login" className="flex h-[46px] w-full items-center justify-center text-sm font-bold text-white/70">
+            {t('mobile.auth.haveAccount')}
+          </Link>
+          <p className="text-center text-xs font-semibold text-white/40">{t('mobile.auth.footer')}</p>
+        </div>
+      </MobileAuthShell>
+
+      <div className="hidden min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 md:block">
       {/* Navigation */}
       <nav className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
@@ -222,8 +257,9 @@ const WelcomePage: React.FC = () => {
           </Link>
         </motion.div>
       </section>
-    </div>
+      </div>
+    </>
   );
 };
 
-export default WelcomePage; 
+export default WelcomePage;

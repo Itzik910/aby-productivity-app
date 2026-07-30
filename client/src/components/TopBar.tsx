@@ -99,7 +99,7 @@ const TopBar: React.FC<TopBarProps> = ({ onOpenCommandPalette }) => {
 
   return (
     <div
-      className="fixed top-0 left-0 right-0 z-50 h-12 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center px-4 gap-2 shadow-sm"
+      className="fixed top-0 left-0 right-0 z-50 h-12 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 hidden md:flex items-center px-4 gap-2 shadow-sm"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       {/* Spacer — leaves room for DashboardButton on the opposite side */}

@@ -102,7 +102,21 @@ module.exports = {
         surface: {
           light: '#f8fafc',
           dark: '#1a1a2e',
-        }
+        },
+        // Scoped palette for the mobile-first redesign (bottom nav, sheets,
+        // Today/Tasks/Calendar/You). Kept separate from primary/secondary/etc
+        // above so the existing desktop screens are untouched.
+        aby: {
+          violet: { DEFAULT: '#5B4BE0', dark: '#A79BFF' },
+          green: { DEFAULT: '#22C55E', dark: '#22C55E' },
+          teal: { DEFAULT: '#0EA5A0', dark: '#2FD3CE' },
+          ink: { DEFAULT: '#14121C', dark: '#F3F1FA' },
+          sub: { DEFAULT: '#6B6580', dark: '#A9A2BE' },
+          muted: { DEFAULT: '#9A93AE', dark: '#8B84A4' },
+          page: { DEFAULT: '#F6F5FB', dark: '#0E0D14' },
+          card: { DEFAULT: '#FFFFFF', dark: '#1A1926' },
+          line: { DEFAULT: '#ECE9F6', dark: '#2C2A3C' },
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

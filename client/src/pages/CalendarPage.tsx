@@ -15,6 +15,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../services/api';
 import { useTaskModalStore } from '../stores/taskModalStore';
 import toast from 'react-hot-toast';
+import MobileCalendarView from '../components/mobile/MobileCalendarView';
+import { MobileTask, isTaskDone } from '../utils/taskDisplay';
 
 interface Task {
   _id: string;
@@ -127,6 +129,22 @@ const CalendarPage: React.FC = () => {
       case 'in_progress': return <Clock className="w-4 h-4 text-blue-600" />;
       case 'pending': return <AlertCircle className="w-4 h-4 text-orange-600" />;
       default: return null;
+    }
+  };
+
+  const toggleTaskMobile = async (task: MobileTask) => {
+    const done = isTaskDone(task);
+    setTasks((prev) =>
+      prev.map((x) => (x._id === task._id ? { ...x, status: done ? 'pending' : 'completed' } as Task : x))
+    );
+    try {
+      if (done) {
+        await api.put(`/tasks/${task._id}`, { status: 'pending' });
+      } else {
+        await api.patch(`/tasks/${task._id}/complete`);
+      }
+    } catch {
+      fetchTasks();
     }
   };
 
@@ -248,7 +266,9 @@ const CalendarPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 pt-14">
+    <>
+      <MobileCalendarView tasks={tasks as unknown as MobileTask[]} onToggle={toggleTaskMobile} />
+      <div className="hidden min-h-screen bg-gray-50 dark:bg-gray-900 p-6 pt-14 md:block">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -564,7 +584,8 @@ const CalendarPage: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+      </div>
+    </>
   );
 };
 

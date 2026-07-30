@@ -19,6 +19,7 @@ import {
 import { useAuthStore } from '../stores/authStore';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 
 interface PremiumStatus {
   isPremium: boolean;
@@ -77,7 +78,19 @@ const stressLevels = ['low', 'moderate', 'high', 'very_high'];
 const sleepPatterns = ['early_bird', 'night_owl', 'regular', 'irregular'];
 const communicationMethods = ['email', 'sms', 'push_notifications', 'in_app', 'phone'];
 
+const MOBILE_PROFILE_ROWS: Array<{ key: string; missingKeys: string[]; labelKey: string; hintKey: string }> = [
+  { key: 'phone', missingKeys: ['phoneNumber'], labelKey: 'phone', hintKey: 'phoneHint' },
+  { key: 'dob', missingKeys: ['dateOfBirth'], labelKey: 'dob', hintKey: '' },
+  { key: 'address', missingKeys: ['address.city', 'address.country'], labelKey: 'address', hintKey: 'addressHint' },
+  { key: 'interests', missingKeys: ['interests'], labelKey: 'interests', hintKey: 'interestsHint' },
+  { key: 'schedule', missingKeys: ['workSchedule'], labelKey: 'schedule', hintKey: 'scheduleHint' },
+  { key: 'goals', missingKeys: ['goals'], labelKey: 'goals', hintKey: 'goalsHint' },
+  { key: 'stress', missingKeys: ['stressLevel'], labelKey: 'stress', hintKey: '' },
+  { key: 'sleep', missingKeys: ['sleepPattern'], labelKey: 'sleep', hintKey: '' },
+];
+
 const PremiumUpgradePage: React.FC = () => {
+  const { t } = useTranslation();
   const { user, updateUser } = useAuthStore();
   const [premiumStatus, setPremiumStatus] = useState<PremiumStatus | null>(null);
   const [premiumDetails, setPremiumDetails] = useState<PremiumDetails>({});
@@ -171,9 +184,32 @@ const PremiumUpgradePage: React.FC = () => {
     );
   }
 
+  // The mobile checklist merges address.city/address.country into a single
+  // row, so it has fewer rows than the backend's flat requiredFields list
+  // (totalFields). Derive done/total from the row list itself rather than
+  // premiumStatus.completedFields/totalFields, so the top counter always
+  // matches what's actually checked off below.
+  const mobileRowsDone = MOBILE_PROFILE_ROWS.filter(
+    (row) => !!premiumStatus && !row.missingKeys.some((k) => premiumStatus.missingFields?.includes(k))
+  ).length;
+  const mobileRowsTotal = MOBILE_PROFILE_ROWS.length;
+  const mobileProgressPct = mobileRowsTotal ? Math.round((mobileRowsDone / mobileRowsTotal) * 100) : 0;
+
   if (premiumStatus?.isPremium) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
+      <>
+        <div className="min-h-screen bg-aby-page px-5 pb-24 pt-4 dark:bg-aby-page-dark md:hidden">
+          <div className="rounded-[22px] bg-aby-ink p-6 text-center">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-white/10">
+              <Crown className="h-7 w-7 text-[#A79BFF]" />
+            </div>
+            <h1 className="text-lg font-extrabold text-white">{t('mobile.premium.title')} ✦</h1>
+            <p className="mt-1.5 text-[13px] font-medium text-white/70">
+              {premiumStatus.premiumFeatures?.length || 0} features unlocked, for good.
+            </p>
+          </div>
+        </div>
+        <div className="hidden min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 md:block">
         <div className="container mx-auto px-4 py-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -225,12 +261,77 @@ const PremiumUpgradePage: React.FC = () => {
             </div>
           </motion.div>
         </div>
-      </div>
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
+    <>
+      {/* ---------- Mobile checklist layout ---------- */}
+      <div className="min-h-screen bg-aby-page pb-24 dark:bg-aby-page-dark md:hidden">
+        <div className="px-5 pt-4">
+          <h1 className="text-[21px] font-extrabold text-aby-ink dark:text-aby-ink-dark">{t('mobile.premium.title')}</h1>
+
+          <div className="mt-4 rounded-[20px] bg-aby-ink p-[18px]">
+            <div className="flex items-baseline justify-between">
+              <span className="text-[17px] font-extrabold text-white">
+                {t('mobile.premium.profileCount', { done: mobileRowsDone, total: mobileRowsTotal })}
+              </span>
+              <span className="text-xs font-semibold text-[#A79BFF]">{t('mobile.premium.noCard')}</span>
+            </div>
+            <div className="mt-3 h-[9px] rounded-full bg-white/15">
+              <div className="h-[9px] rounded-full bg-gradient-to-r from-[#7BF1A8] to-[#22C55E]" style={{ width: `${mobileProgressPct}%` }} />
+            </div>
+            <p className="mt-3 text-[13px] font-medium text-white/75">{t('mobile.premium.intro')}</p>
+          </div>
+
+          <div className="mb-2.5 mt-6 text-[11px] font-extrabold tracking-wide text-aby-muted dark:text-aby-muted-dark">
+            {t('mobile.premium.yourProfile')}
+          </div>
+          <div className="flex flex-col gap-2.5">
+            {MOBILE_PROFILE_ROWS.map((row) => {
+              const done = !!premiumStatus && !row.missingKeys.some((k) => premiumStatus.missingFields?.includes(k));
+              return (
+                <button
+                  key={row.key}
+                  disabled={done}
+                  onClick={() => toast(t('mobile.premium.editOnDesktop') as string)}
+                  className={`flex w-full items-center gap-3 rounded-2xl border p-3.5 text-start ${
+                    done
+                      ? 'border-aby-line bg-aby-card dark:border-aby-line-dark dark:bg-aby-card-dark'
+                      : 'border-[#FAE3B0] bg-[#FFF9EC] dark:border-[#6A5320] dark:bg-[#332B1C]'
+                  }`}
+                >
+                  <span
+                    className={`flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-lg ${
+                      done ? 'bg-aby-green text-white' : 'border-2 border-[#E7C77A] bg-white dark:bg-transparent'
+                    }`}
+                  >
+                    {done && '✓'}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className={`block text-[14.5px] font-bold ${done ? 'text-aby-ink dark:text-aby-ink-dark' : 'text-[#7A5B10]'}`}>
+                      {t(`mobile.premium.fields.${row.labelKey}`)}
+                    </span>
+                    {row.hintKey && !done && (
+                      <span className="mt-0.5 block text-xs font-medium text-[#7A5B10]/80">
+                        {t(`mobile.premium.hints.${row.hintKey}`)}
+                      </span>
+                    )}
+                  </span>
+                  <span className="shrink-0 text-xs font-bold text-aby-violet dark:text-aby-violet-dark">
+                    {done ? t('mobile.premium.saved') : t('mobile.premium.add')}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* ---------- Desktop layout (unchanged) ---------- */}
+      <div className="hidden min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 md:block">
       <div className="container mx-auto px-4 py-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -715,8 +816,9 @@ const PremiumUpgradePage: React.FC = () => {
           </div>
         </motion.div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 
-export default PremiumUpgradePage; 
+export default PremiumUpgradePage;
