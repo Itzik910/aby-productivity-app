@@ -20,6 +20,8 @@ export interface MobileTask {
   dueDate: string;
   estimatedDuration?: number;
   steps: MobileTaskStep[];
+  /** Swipe-to-postpone: hides the task from Today's list until this passes. */
+  hiddenUntil?: string | null;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -77,6 +79,17 @@ export function formatTaskTime(dateStr: string): string {
 
 export function isTaskDone(task: MobileTask): boolean {
   return task.status === 'completed';
+}
+
+/** True while a "swipe right" postpone is still in effect (before the next day starts). */
+export function isHiddenNow(task: MobileTask, now: Date = new Date()): boolean {
+  return !!task.hiddenUntil && new Date(task.hiddenUntil) > now;
+}
+
+/** Midnight at the start of the day after `from` — used to postpone a task "until tomorrow". */
+export function startOfNextDay(from: Date = new Date()): Date {
+  const next = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 1);
+  return next;
 }
 
 // Preferred display order: agentic categories first (ACTIONABLE/FOCUS/OUTING/

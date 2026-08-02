@@ -152,7 +152,7 @@ const he = {
       then: 'אחר כך',
       fixTitle: 'סדר לי את היום',
       fixSub: 'לסדר את הסידורים למסלול אחד יעיל',
-      empty: 'לא נשאר כלום היום — כל הכבוד.',
+      empty: 'הכול מסודר — כל הכבוד.',
       swipePostpone: 'מחר',
       swipeComplete: 'בוצע',
     },

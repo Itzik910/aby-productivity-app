@@ -150,6 +150,12 @@ const taskSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  // Mobile "Today" swipe-to-postpone: hides the task from the home screen's
+  // open-tasks list until this moment passes, independent of dueDate — the
+  // task's actual due date is unaffected by a "not now" swipe.
+  hiddenUntil: {
+    type: Date
+  },
   storedSummary: {
     type: String,
     trim: true,
