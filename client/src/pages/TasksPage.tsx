@@ -29,7 +29,9 @@ import { api } from '../services/api';
 import toast from 'react-hot-toast';
 import { useTaskModalStore } from '../stores/taskModalStore';
 import MobileTasksView from '../components/mobile/MobileTasksView';
+import AbyItModal from '../components/AbyItModal';
 import { MobileTask, isTaskDone } from '../utils/taskDisplay';
+import { AbyItState } from '../types/abyIt';
 
 interface AISuggestion {
   header: string;
@@ -85,7 +87,9 @@ interface Task {
     isCompleted: boolean;
     completedAt?: string;
     order: number;
+    source?: 'user' | 'aby';
   }>;
+  abyIt?: AbyItState;
 }
 
 interface TaskEditForm {
@@ -139,6 +143,7 @@ const TasksPage: React.FC = () => {
   const [loadingFiveWays, setLoadingFiveWays] = useState(false);
   const [sharingTask, setSharingTask] = useState<Task | null>(null);
   const [focusTask, setFocusTask] = useState<Task | null>(null);
+  const [abyItTask, setAbyItTask] = useState<Task | null>(null);
 
   const categories = [
     { value: 'work', label: 'Work', color: 'bg-blue-500', icon: '💼' },
@@ -670,6 +675,23 @@ const TasksPage: React.FC = () => {
                       </div>
                     )}
 
+                    {/* Persisted ABY it result */}
+                    {task.abyIt && task.abyIt.status !== 'idle' && (
+                      <button
+                        onClick={() => setAbyItTask(task)}
+                        className="mb-3 flex w-full items-start gap-2 rounded-lg border border-purple-100 bg-purple-50 px-3 py-2 text-start hover:border-purple-300"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 shrink-0 mt-0.5 text-purple-500" />
+                        <span className="text-xs text-purple-800 line-clamp-2">
+                          {task.abyIt.status === 'awaiting_answer'
+                            ? 'ABY has a quick question — tap to answer'
+                            : task.abyIt.mode === 'location'
+                            ? task.abyIt.locationSuggestion?.summary || "ABY's suggestion"
+                            : 'ABY split this into steps below'}
+                        </span>
+                      </button>
+                    )}
+
                     {/* Checklist */}
                     <div className="border-t border-gray-100 pt-3 mt-3">
                       <TaskChecklist
@@ -699,6 +721,14 @@ const TasksPage: React.FC = () => {
                         </button>
                       )}
                       
+                      <button
+                        onClick={() => setAbyItTask(task)}
+                        className="flex items-center space-x-1 px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                        title="ABY asks what it needs to know, then breaks this down or points you to a real place"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        <span className="text-sm">ABY it</span>
+                      </button>
                       <button
                         onClick={() => generateFiveWays(task)}
                         disabled={loadingFiveWays}
@@ -1217,6 +1247,20 @@ const TasksPage: React.FC = () => {
         taskTitle={focusTask?.title}
         onClose={() => setFocusTask(null)}
       />
+
+      {/* ABY it */}
+      {abyItTask && (
+        <AbyItModal
+          taskId={abyItTask._id}
+          initial={abyItTask.abyIt}
+          onClose={() => setAbyItTask(null)}
+          onResult={({ abyIt, steps }) => {
+            setTasks((prev) =>
+              prev.map((t) => (t._id === abyItTask._id ? { ...t, abyIt, ...(steps ? { steps } : {}) } : t))
+            );
+          }}
+        />
+      )}
       </div>
     </>
   );

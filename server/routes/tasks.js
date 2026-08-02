@@ -633,6 +633,63 @@ router.get('/:id/five-ways', auth, async (req, res) => {
   }
 });
 
+// @route   POST /tasks/:id/aby-it
+// @desc    One turn of the "ABY it" conversation: ask a clarifying question,
+//          or finalize with a location recommendation / step breakdown.
+//          Persisted on the task so re-opening it shows the same result.
+// @access  Private
+router.post('/:id/aby-it', auth, async (req, res) => {
+  try {
+    const task = await Task.findOne({ _id: req.params.id, user: req.user.id });
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    if (task.abyIt.status === 'completed') {
+      return res.json({ abyIt: task.abyIt, steps: task.steps });
+    }
+
+    const { answer } = req.body;
+    if (answer && task.abyIt.conversation.length) {
+      const pending = task.abyIt.conversation[task.abyIt.conversation.length - 1];
+      if (!pending.answer) {
+        pending.answer = String(answer).slice(0, 500);
+        pending.answeredAt = new Date();
+      }
+    }
+
+    const user = await User.findById(req.user.id);
+    const history = task.abyIt.conversation.map(c => ({ question: c.question, answer: c.answer }));
+    const result = await aiService.abyIt(task, user, history);
+
+    if (result.action === 'ask') {
+      task.abyIt.status = 'awaiting_answer';
+      task.abyIt.conversation.push({ question: result.question });
+      await task.save();
+      return res.json({ abyIt: task.abyIt });
+    }
+
+    task.abyIt.status = 'completed';
+    task.abyIt.generatedAt = new Date();
+
+    if (result.action === 'location') {
+      task.abyIt.mode = 'location';
+      task.abyIt.locationSuggestion = result.locationSuggestion;
+      await task.save();
+      return res.json({ abyIt: task.abyIt });
+    }
+
+    task.abyIt.mode = 'breakdown';
+    const baseOrder = task.steps.length;
+    result.steps.forEach((s, i) => {
+      task.steps.push({ title: s.title, description: s.description || '', order: baseOrder + i + 1, source: 'aby' });
+    });
+    await task.save();
+    res.json({ abyIt: task.abyIt, steps: task.steps });
+  } catch (error) {
+    console.error('Error in aby-it:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // ─── Steps / Checklist ────────────────────────────────────────────────────────
 
 // @route   POST /tasks/:id/steps
@@ -678,6 +735,11 @@ router.patch('/:id/steps/:stepIndex/uncomplete', auth, async (req, res) => {
     if (!task.steps[idx]) return res.status(404).json({ message: 'Step not found' });
     task.steps[idx].isCompleted = false;
     task.steps[idx].completedAt = undefined;
+    // If completing every step had auto-finished the task, unchecking one reopens it.
+    if (task.status === 'completed') {
+      task.status = 'pending';
+      task.completedAt = undefined;
+    }
     await task.save();
     res.json({ success: true, steps: task.steps, progress: task.progress });
   } catch (error) {

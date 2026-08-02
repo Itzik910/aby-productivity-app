@@ -3,11 +3,14 @@
 // TasksPage.tsx and CalendarPage.tsx already fetch), not the agentic
 // AgentTask shape used by the Dashboard's swipe-deck.
 
+import { AbyItState } from '../types/abyIt';
+
 export interface MobileTaskStep {
   _id?: string;
   title: string;
   isCompleted: boolean;
   order: number;
+  source?: 'user' | 'aby';
 }
 
 export interface MobileTask {
@@ -22,6 +25,7 @@ export interface MobileTask {
   steps: MobileTaskStep[];
   /** Swipe-to-postpone: hides the task from Today's list until this passes. */
   hiddenUntil?: string | null;
+  abyIt?: AbyItState;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {

@@ -30,6 +30,7 @@ function placeDebug(...args) {
 }
 
 const KEYWORD_RULES = [
+  { pattern: /(atm|cash|withdraw|כספומט|למשוך כסף|למשוך מזומן)/i, keyword: 'ATM' },
   { pattern: /(grocer|grocery|shop|buy|errand|market|suppl)/i, keyword: 'grocery store' },
   { pattern: /(clean|laundr|wash|fold)/i, keyword: 'laundromat' },
   { pattern: /(repair|fix|assemble|handyman|hardware)/i, keyword: 'hardware store' },

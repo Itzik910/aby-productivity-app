@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Check, Loader2 } from 'lucide-react';
+import { X, Check, Loader2, Sparkles } from 'lucide-react';
 import { api } from '../../services/api';
 import { useLanguageStore } from '../../stores/languageStore';
 import { useMobileUiStore } from '../../stores/mobileUiStore';
 import BottomSheet from './BottomSheet';
+import AbyItModal from '../AbyItModal';
 import { MobileTask, categoryColor, priorityBadge, formatTaskTime, isTaskDone } from '../../utils/taskDisplay';
 
 /**
@@ -21,8 +22,10 @@ const TaskDetailSheet: React.FC = () => {
   const closeSheet = useMobileUiStore((s) => s.closeSheet);
   const [task, setTask] = useState<MobileTask | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showAbyIt, setShowAbyIt] = useState(false);
 
   useEffect(() => {
+    setShowAbyIt(false);
     if (!isOpen || !taskId) {
       setTask(null);
       return;
@@ -72,6 +75,13 @@ const TaskDetailSheet: React.FC = () => {
 
   const done = task ? isTaskDone(task) : false;
   const badge = task ? priorityBadge(task.priority) : null;
+
+  const abyItSummary = (() => {
+    if (!task?.abyIt || task.abyIt.status === 'idle') return null;
+    if (task.abyIt.status === 'awaiting_answer') return t('mobile.abyIt.askedTitle');
+    if (task.abyIt.mode === 'location') return task.abyIt.locationSuggestion?.summary || t('mobile.abyIt.locationTitle');
+    return t('mobile.abyIt.breakdownTitle');
+  })();
 
   return (
     <BottomSheet isOpen={isOpen} onClose={closeSheet} maxHeight="80vh">
@@ -127,6 +137,28 @@ const TaskDetailSheet: React.FC = () => {
               </div>
             </div>
 
+            <div className="mt-4">
+              {abyItSummary ? (
+                <button
+                  onClick={() => setShowAbyIt(true)}
+                  className="flex w-full items-start gap-2.5 rounded-2xl border border-aby-violet/30 bg-[#EDE8FE]/60 p-3 text-start dark:bg-[#2E2A4A]/60"
+                >
+                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-aby-violet dark:text-aby-violet-dark" />
+                  <span className="line-clamp-2 min-w-0 flex-1 text-xs font-semibold leading-relaxed text-aby-ink dark:text-aby-ink-dark">
+                    {abyItSummary}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowAbyIt(true)}
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-aby-violet/40 text-sm font-bold text-aby-violet dark:text-aby-violet-dark"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  {t('mobile.abyIt.button')}
+                </button>
+              )}
+            </div>
+
             {task.steps.length > 0 && (
               <>
                 <div className="mb-2.5 mt-5 text-[11px] font-extrabold tracking-wide text-aby-muted dark:text-aby-muted-dark">
@@ -144,10 +176,11 @@ const TaskDetailSheet: React.FC = () => {
                         {step.isCompleted && <Check className="h-3 w-3 text-white" strokeWidth={3.4} />}
                       </button>
                       <span
-                        className={`text-sm font-medium ${
+                        className={`flex items-center gap-1 text-sm font-medium ${
                           step.isCompleted ? 'text-aby-muted line-through dark:text-aby-muted-dark' : 'text-[#3B3552] dark:text-aby-ink-dark'
                         }`}
                       >
+                        {step.source === 'aby' && <Sparkles className="h-3 w-3 shrink-0 text-aby-violet dark:text-aby-violet-dark" />}
                         {step.title}
                       </span>
                     </div>
@@ -170,6 +203,17 @@ const TaskDetailSheet: React.FC = () => {
           </>
         )}
       </div>
+      {showAbyIt && task && (
+        <AbyItModal
+          taskId={task._id}
+          initial={task.abyIt}
+          onClose={() => setShowAbyIt(false)}
+          onResult={({ abyIt, steps }) => {
+            setTask((prev) => (prev ? { ...prev, abyIt, ...(steps ? { steps } : {}) } : prev));
+            refresh();
+          }}
+        />
+      )}
     </BottomSheet>
   );
 };

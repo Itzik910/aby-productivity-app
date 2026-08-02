@@ -327,6 +327,106 @@ Return ONLY a JSON array of objects, each with "title" (max 80 chars) and "descr
     }
   }
 
+  // "ABY it" — a short, stateless conversation turn. Given the task and the
+  // Q&A exchanged so far, decide whether to ask one more clarifying question,
+  // hand back a location recommendation (real nearby places only), or break
+  // the task into personalized subtasks.
+  async abyIt(task, user, conversation = []) {
+    const taskCtx = this.buildDetailedTaskContext(task);
+    const taskIsDIY = isDIYTask(task);
+    const placeSuggestions = taskIsDIY ? [] : await getPlaceSuggestions(task, user);
+    const placeCtx = this.buildPlaceContext(placeSuggestions);
+    const mustFinalize = conversation.length >= 2;
+
+    const fallback = () => this._abyItFallback(task, placeSuggestions);
+    if (!openai) return fallback();
+
+    const historyText = conversation.length
+      ? conversation.map((c, i) => `Q${i + 1}: ${c.question}\nA${i + 1}: ${c.answer || '(no answer yet)'}`).join('\n')
+      : 'None yet.';
+
+    try {
+      const response = await openai.chat.completions.create({
+        model: this.defaultModel,
+        messages: [{
+          role: 'user',
+          content: `You are ABY, a smart productivity assistant. The user tapped "ABY it" on a task, asking you to help them get it done.
+
+${taskCtx}
+
+CONVERSATION SO FAR:
+${historyText}
+
+NEARBY PLACES (only mention these if you choose the "location" action — never invent an address):
+${placeCtx || 'None found.'}
+
+Decide exactly ONE of three actions:
+1. "ask" — only if one short clarifying question would meaningfully personalize your suggestion (e.g. style/preference/budget). Ask at most one question at a time, and never repeat a question already asked above.${mustFinalize ? ' You have already asked enough questions — do NOT choose "ask" again, you MUST finalize now.' : ''}
+2. "location" — if this is a simple, logistical task best solved by pointing the user to a real nearby place from NEARBY PLACES above. No breakdown needed.
+3. "breakdown" — otherwise: split the task into 2-6 concrete, personalized subtasks, using anything learned from the conversation above.
+
+Respond in the SAME language the task title is written in.
+
+Return ONLY a valid JSON object of ONE of these shapes:
+{"action": "ask", "question": "<string>"}
+{"action": "location", "summary": "<one short encouraging sentence>"}
+{"action": "breakdown", "steps": [{"title": "<max 80 chars>", "description": "<optional one sentence>"}]}`
+        }],
+        max_tokens: 500,
+        temperature: 0.4
+      });
+
+      const parsed = this.parseJsonResponse(response.choices[0].message.content);
+
+      if (parsed.action === 'ask' && !mustFinalize && parsed.question) {
+        return { action: 'ask', question: String(parsed.question).slice(0, 300) };
+      }
+      if (parsed.action === 'location') {
+        return {
+          action: 'location',
+          locationSuggestion: {
+            summary: String(parsed.summary || '').slice(0, 300),
+            places: placeSuggestions.slice(0, 3).map(p => ({ name: p.name, address: p.address, mapsUrl: p.mapsUrl }))
+          }
+        };
+      }
+      if (Array.isArray(parsed.steps) && parsed.steps.length > 0) {
+        return {
+          action: 'breakdown',
+          steps: parsed.steps.slice(0, 6).map(s => ({
+            title: String(s.title || '').slice(0, 100),
+            description: s.description ? String(s.description).slice(0, 300) : ''
+          }))
+        };
+      }
+      return fallback();
+    } catch (error) {
+      console.error('abyIt error:', error.message);
+      return fallback();
+    }
+  }
+
+  _abyItFallback(task, placeSuggestions = []) {
+    if (placeSuggestions.length > 0) {
+      return {
+        action: 'location',
+        locationSuggestion: {
+          summary: `Here's a nearby option for "${task.title}".`,
+          places: placeSuggestions.slice(0, 3).map(p => ({ name: p.name, address: p.address, mapsUrl: p.mapsUrl }))
+        }
+      };
+    }
+    return {
+      action: 'breakdown',
+      steps: [
+        { title: 'Define the scope and requirements', description: '' },
+        { title: 'Gather necessary resources or information', description: '' },
+        { title: 'Execute the main work', description: '' },
+        { title: 'Review and check quality', description: '' },
+      ]
+    };
+  }
+
   parseJsonResponse(content) {
     const text = String(content || '').trim();
     const stripped = text
