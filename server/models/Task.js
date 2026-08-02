@@ -178,9 +178,45 @@ const taskSchema = new mongoose.Schema({
     order: {
       type: Number,
       required: true
+    },
+    source: {
+      type: String,
+      enum: ['user', 'aby'],
+      default: 'user'
     }
   }],
-  
+
+  // "ABY it" — the assistant either asks 1-2 clarifying questions and then
+  // breaks the task into steps (persisted above, tagged source: 'aby'), or
+  // gives a location-based recommendation. Persisted here so re-opening the
+  // task from anywhere shows the same result instead of re-asking.
+  abyIt: {
+    status: {
+      type: String,
+      enum: ['idle', 'awaiting_answer', 'completed'],
+      default: 'idle'
+    },
+    mode: {
+      type: String,
+      enum: ['breakdown', 'location']
+    },
+    conversation: [{
+      question: { type: String, required: true },
+      answer: String,
+      askedAt: { type: Date, default: Date.now },
+      answeredAt: Date
+    }],
+    locationSuggestion: {
+      summary: String,
+      places: [{
+        name: String,
+        address: String,
+        mapsUrl: String
+      }]
+    },
+    generatedAt: Date
+  },
+
   // Attachments & Resources
   attachments: [{
     filename: String,
@@ -362,6 +398,11 @@ taskSchema.methods.completeStep = function(stepIndex) {
   if (this.steps[stepIndex]) {
     this.steps[stepIndex].isCompleted = true;
     this.steps[stepIndex].completedAt = new Date();
+    // Checking off the last remaining step finishes the whole task.
+    if (this.steps.length > 0 && this.steps.every(s => s.isCompleted) && this.status !== 'completed') {
+      this.status = 'completed';
+      this.completedAt = new Date();
+    }
     return this.save();
   }
   throw new Error('Step not found');

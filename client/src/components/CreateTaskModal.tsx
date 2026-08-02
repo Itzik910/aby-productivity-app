@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, MapPin, Clock, Tag, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Calendar, MapPin, Clock, Tag, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
+import AbyItModal from './AbyItModal';
 
 interface CreateTaskModalProps {
   isOpen: boolean;
@@ -85,27 +86,32 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   const removeTag = (tag: string) => setTags(tags.filter(t => t !== tag));
 
   const canCreate = title.trim().length > 0 && priority !== '';
+  const [abyItTaskId, setAbyItTaskId] = useState<string | null>(null);
+  const [savingForAbyIt, setSavingForAbyIt] = useState(false);
+
+  const buildTaskData = (): Record<string, unknown> => {
+    const taskData: Record<string, unknown> = {
+      title: title.trim(),
+      description,
+      category,
+      priority,
+      dueDate: dueDate || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      estimatedDuration: estimatedDuration ? parseInt(estimatedDuration) : undefined,
+      tags,
+      location: locationName.trim() ? { name: locationName.trim(), address: '' } : undefined,
+    };
+    if (isRecurring) {
+      taskData.isRecurring = true;
+      taskData.recurrence = { pattern: recurrencePattern, interval: 1 };
+    }
+    return taskData;
+  };
 
   const createTask = async () => {
     if (!canCreate) return;
 
     try {
-      const taskData: Record<string, unknown> = {
-        title: title.trim(),
-        description,
-        category,
-        priority,
-        dueDate: dueDate || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        estimatedDuration: estimatedDuration ? parseInt(estimatedDuration) : undefined,
-        tags,
-        location: locationName.trim() ? { name: locationName.trim(), address: '' } : undefined,
-      };
-      if (isRecurring) {
-        taskData.isRecurring = true;
-        taskData.recurrence = { pattern: recurrencePattern, interval: 1 };
-      }
-
-      await api.post('/tasks', taskData);
+      await api.post('/tasks', buildTaskData());
       toast.success('Task created! 🎉');
       resetForm();
       onClose();
@@ -114,6 +120,24 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     } catch (error) {
       console.error('Error creating task:', error);
       toast.error('Failed to create task');
+    }
+  };
+
+  // ABY it needs a real task to attach its conversation/steps to, so it
+  // saves the task first (silently), then opens the conversation for it.
+  const handleAbyIt = async () => {
+    if (!canCreate || savingForAbyIt) return;
+    setSavingForAbyIt(true);
+    try {
+      const res = await api.post('/tasks', buildTaskData());
+      onTaskCreated?.();
+      window.dispatchEvent(new Event('taskCreated'));
+      setAbyItTaskId(res.data._id);
+    } catch (error) {
+      console.error('Error creating task:', error);
+      toast.error('Failed to create task');
+    } finally {
+      setSavingForAbyIt(false);
     }
   };
 
@@ -378,6 +402,18 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               Cancel
             </button>
             <button
+              onClick={handleAbyIt}
+              disabled={!canCreate || savingForAbyIt}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold border transition-all
+                ${canCreate
+                  ? 'border-purple-300 text-purple-700 hover:bg-purple-50'
+                  : 'border-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
+            >
+              <Sparkles className="w-4 h-4" />
+              ABY it
+            </button>
+            <button
               onClick={createTask}
               disabled={!canCreate}
               className={`px-6 py-2 rounded-lg text-sm font-semibold text-white transition-all
@@ -391,6 +427,17 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           </div>
         </motion.div>
       </motion.div>
+      {abyItTaskId && (
+        <AbyItModal
+          taskId={abyItTaskId}
+          onClose={() => {
+            setAbyItTaskId(null);
+            resetForm();
+            onClose();
+          }}
+          onResult={() => {}}
+        />
+      )}
     </AnimatePresence>
   );
 };
