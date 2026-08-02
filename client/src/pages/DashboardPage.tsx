@@ -11,7 +11,15 @@ import HeroInput from '../components/HeroInput';
 import TaskCard from '../components/TaskCard';
 import FixMyDayModal from '../components/FixMyDayModal';
 import SwipeableTaskRow from '../components/mobile/SwipeableTaskRow';
-import { MobileTask, isSameDay, isTaskDone, groupByCategory, categoryLabel } from '../utils/taskDisplay';
+import {
+  MobileTask,
+  isSameDay,
+  isTaskDone,
+  isHiddenNow,
+  startOfNextDay,
+  groupByCategory,
+  categoryLabel,
+} from '../utils/taskDisplay';
 
 const DashboardPage: React.FC = () => {
   const { t } = useTranslation();
@@ -64,16 +72,15 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  // Swipe right on a Today row: push it to tomorrow so it naturally drops
-  // off today's list and reappears on tomorrow's Today/Calendar view —
-  // no separate "snoozed" flag needed, it's just the same dueDate filtering
-  // every other mobile screen already uses.
+  // Swipe right on a row: hide it from this list until tomorrow, without
+  // touching its actual due date — the open-tasks list below shows every
+  // open task regardless of date, so "not now" has to be its own flag
+  // rather than relying on date filtering to make it disappear.
   const postponeTask = async (task: MobileTask) => {
-    const next = new Date(task.dueDate);
-    next.setDate(next.getDate() + 1);
-    setMobileTasks((prev) => prev.filter((x) => x._id !== task._id));
+    const hiddenUntil = startOfNextDay().toISOString();
+    setMobileTasks((prev) => prev.map((x) => (x._id === task._id ? { ...x, hiddenUntil } : x)));
     try {
-      await api.put(`/tasks/${task._id}`, { dueDate: next.toISOString() });
+      await api.put(`/tasks/${task._id}`, { hiddenUntil });
     } catch {
       fetchMobileTasks();
     }
@@ -112,12 +119,15 @@ const DashboardPage: React.FC = () => {
   }, [setTasks]);
 
   const now = new Date();
+  // The progress ring stays scoped to today's plan (X of Y done today).
   const todayTasks = mobileTasks.filter((mt) => isSameDay(new Date(mt.dueDate), now));
   const doneCount = todayTasks.filter(isTaskDone).length;
   const totalCount = todayTasks.length;
   const pct = totalCount ? Math.round((doneCount / totalCount) * 100) : 0;
-  const openToday = todayTasks.filter((mt) => !isTaskDone(mt));
-  const categoryGroups = groupByCategory(openToday);
+  // The swipeable list below it shows every open task regardless of date —
+  // "not now" (swipe right) is what keeps it out of view, not its due date.
+  const openTasks = mobileTasks.filter((mt) => !isTaskDone(mt) && !isHiddenNow(mt, now));
+  const categoryGroups = groupByCategory(openTasks);
   const streak = user?.stats?.currentStreak || 0;
 
   const dateLine = now
@@ -202,7 +212,7 @@ const DashboardPage: React.FC = () => {
                   {t('mobile.today.upNow')}
                 </span>
                 <span className="text-xs font-semibold text-aby-muted dark:text-aby-muted-dark">
-                  {t('mobile.today.openCount', { n: openToday.length })}
+                  {t('mobile.today.openCount', { n: openTasks.length })}
                 </span>
               </div>
 
