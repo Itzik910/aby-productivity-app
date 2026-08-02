@@ -33,6 +33,9 @@ const OnboardingTour: React.FC = () => {
       setRect(null);
       return;
     }
+    // Stale rect from the previous step must never linger while we look for
+    // the new target - it would spotlight the wrong element for a frame.
+    setRect(null);
     let raf = 0;
     let attempts = 0;
     const measure = () => {
@@ -44,7 +47,24 @@ const OnboardingTour: React.FC = () => {
       }
     };
     raf = requestAnimationFrame(measure);
-    return () => cancelAnimationFrame(raf);
+
+    // Mobile browsers (notably iOS Safari) resize the visual viewport as
+    // their address bar/toolbar collapses or expands - which happens mid-tour
+    // as the user taps around. getBoundingClientRect() is only accurate for
+    // the instant it's called, so without re-measuring on these events the
+    // spotlight and tooltip drift away from the real target position.
+    const remeasure = () => raf = requestAnimationFrame(measure);
+    window.addEventListener('resize', remeasure);
+    window.addEventListener('scroll', remeasure, true);
+    window.visualViewport?.addEventListener('resize', remeasure);
+    window.visualViewport?.addEventListener('scroll', remeasure);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', remeasure);
+      window.removeEventListener('scroll', remeasure, true);
+      window.visualViewport?.removeEventListener('resize', remeasure);
+      window.visualViewport?.removeEventListener('scroll', remeasure);
+    };
   }, [stage]);
 
   if (stage === null) return null;

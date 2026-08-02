@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
 import { last7Days } from '../utils/habitDisplay';
+import HabitCheckRing from '../components/mobile/HabitCheckRing';
 
 interface Habit {
   _id: string;
@@ -161,18 +162,12 @@ const HabitsPage: React.FC = () => {
                             : t('mobile.habits.startAgain', { best: habit.longestStreak })}
                         </p>
                       </div>
-                      <button
-                        onClick={() => toggleToday(habit)}
+                      <HabitCheckRing
+                        done={doneToday}
+                        color={habit.color}
                         disabled={togglingId === habit._id}
-                        className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-2xl"
-                        style={
-                          doneToday
-                            ? { background: habit.color, color: '#fff' }
-                            : { border: '2px dashed #DDD8EC', color: '#C9C2E0' }
-                        }
-                      >
-                        <Check className="h-5 w-5" strokeWidth={3} />
-                      </button>
+                        onToggle={() => toggleToday(habit)}
+                      />
                     </div>
                     <div className="mt-3 flex gap-1.5">
                       {last7Days(habit).map((done, i) => (
