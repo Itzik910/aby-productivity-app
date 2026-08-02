@@ -6,6 +6,9 @@ import { useTaskStore } from '../../stores/taskStore';
 import { useTaskStream } from '../../hooks/useTaskStream';
 import { useMobileUiStore } from '../../stores/mobileUiStore';
 import BottomSheet from './BottomSheet';
+import motivationLines from '../../data/motivationLines';
+
+const ROTATE_MS = 4200;
 
 /**
  * "Ask ABY" quick-add sheet. Drives its streaming-progress UI off the real
@@ -14,13 +17,15 @@ import BottomSheet from './BottomSheet';
  */
 const ComposeSheet: React.FC = () => {
   const { t } = useTranslation();
-  const { isRtl } = useLanguageStore();
+  const { isRtl, language } = useLanguageStore();
   const isOpen = useMobileUiStore((s) => s.sheet === 'compose');
   const closeSheet = useMobileUiStore((s) => s.closeSheet);
   const { isStreaming, streamMessage, error } = useTaskStore();
   const { submit } = useTaskStream();
   const [value, setValue] = useState('');
+  const [motivIndex, setMotivIndex] = useState(0);
   const wasStreaming = useRef(false);
+  const wasOpen = useRef(false);
 
   useEffect(() => {
     if (wasStreaming.current && !isStreaming && !error) {
@@ -29,6 +34,26 @@ const ComposeSheet: React.FC = () => {
     }
     wasStreaming.current = isStreaming;
   }, [isStreaming, error, closeSheet]);
+
+  // Start each fresh open on a random line, then rotate through the rest
+  // every few seconds while the sheet is open and idle — mirrors the design's
+  // "talk to ABY" motivational prompts instead of one static placeholder.
+  useEffect(() => {
+    if (isOpen && !wasOpen.current) {
+      setMotivIndex(Math.floor(Math.random() * 97));
+    }
+    wasOpen.current = isOpen;
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || isStreaming) return;
+    const id = setInterval(() => setMotivIndex((i) => i + 1), ROTATE_MS);
+    return () => clearInterval(id);
+  }, [isOpen, isStreaming]);
+
+  const motivSet = motivationLines[language];
+  const placeholder =
+    motivSet && motivSet.length ? motivSet[motivIndex % motivSet.length] : (t('mobile.today.askPlaceholder') as string);
 
   const handleSubmit = () => {
     if (value.trim().length <= 2 || isStreaming) return;
@@ -78,7 +103,7 @@ const ComposeSheet: React.FC = () => {
             <textarea
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              placeholder={t('mobile.today.askPlaceholder') as string}
+              placeholder={placeholder}
               rows={3}
               className="w-full resize-none rounded-2xl border border-aby-line bg-aby-page p-3.5 text-[15px] font-medium text-aby-ink outline-none dark:border-aby-line-dark dark:bg-aby-page-dark dark:text-aby-ink-dark"
             />
