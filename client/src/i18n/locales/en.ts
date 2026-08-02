@@ -152,7 +152,7 @@ const en = {
       then: 'THEN',
       fixTitle: 'Fix My Day',
       fixSub: 'Order your errands into one efficient route',
-      empty: 'Nothing left today — nice work.',
+      empty: "You're all caught up — nice work.",
       swipePostpone: 'Tomorrow',
       swipeComplete: 'Done',
     },
