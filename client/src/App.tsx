@@ -115,6 +115,18 @@ function App() {
     return () => window.removeEventListener('aby:server-waking', handler);
   }, []);
 
+  // Same cold-start situation, but for a request that changes something
+  // (create/update/delete) — the interceptor deliberately does NOT
+  // auto-retry those (it can't know whether the write already went
+  // through), so tell the user to check rather than implying it'll recover
+  // on its own.
+  React.useEffect(() => {
+    const handler = () =>
+      toast('השרת התעורר לאט מהצפוי — בדוק/י אם הפעולה הצליחה לפני שמנסים שוב', { icon: '⚠️', duration: 8000 });
+    window.addEventListener('aby:server-waking-mutation', handler);
+    return () => window.removeEventListener('aby:server-waking-mutation', handler);
+  }, []);
+
   // Apply theme to document (supports 'auto' via prefers-color-scheme)
   React.useEffect(() => {
     const applyTheme = () => {

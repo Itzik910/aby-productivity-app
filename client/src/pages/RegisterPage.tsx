@@ -240,14 +240,16 @@ const RegisterPage: React.FC = () => {
           <button
             type="button"
             onClick={handleMobileSubmit}
-            className="h-[50px] w-full rounded-2xl bg-white text-sm font-bold text-aby-ink"
+            disabled={isLoading}
+            className="h-[50px] w-full rounded-2xl bg-white text-sm font-bold text-aby-ink disabled:opacity-60"
           >
             {t('mobile.auth.apple')}
           </button>
           <button
             type="button"
             onClick={handleMobileSubmit}
-            className="h-[50px] w-full rounded-2xl border border-white/[.18] text-sm font-bold text-white"
+            disabled={isLoading}
+            className="h-[50px] w-full rounded-2xl border border-white/[.18] text-sm font-bold text-white disabled:opacity-60"
           >
             {t('mobile.auth.google')}
           </button>

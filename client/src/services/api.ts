@@ -1,5 +1,9 @@
 import axios from 'axios';
 
+// Only these HTTP methods are safe to auto-replay on a lost response — they
+// can't have caused a server-side write, unlike POST/PUT/PATCH/DELETE.
+const SAFE_RETRY_METHODS = new Set(['get', 'head', 'options']);
+
 // Create axios instance
 export const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
@@ -111,10 +115,24 @@ api.interceptors.response.use(
     const isTimeoutOrNetworkError =
       !error.response && (error.code === 'ECONNABORTED' || error.message === 'Network Error');
     if (isTimeoutOrNetworkError && originalRequest && !originalRequest._coldStartRetry) {
+      const method = (originalRequest.method || 'get').toLowerCase();
+      if (SAFE_RETRY_METHODS.has(method)) {
+        originalRequest._coldStartRetry = true;
+        originalRequest.timeout = 60000;
+        window.dispatchEvent(new CustomEvent('aby:server-waking'));
+        return api(originalRequest);
+      }
+
+      // A lost response on a mutating request (POST/PUT/PATCH/DELETE) means
+      // we cannot know whether the server-side write already happened —
+      // blindly replaying it here is exactly what caused registration to
+      // create a user, lose the response, then have the retry correctly
+      // (but confusingly) get rejected as "already exists". Surface a
+      // distinct, honest error instead of silently retrying a write.
       originalRequest._coldStartRetry = true;
-      originalRequest.timeout = 60000;
-      window.dispatchEvent(new CustomEvent('aby:server-waking'));
-      return api(originalRequest);
+      error.isColdStartMutationTimeout = true;
+      window.dispatchEvent(new CustomEvent('aby:server-waking-mutation'));
+      return Promise.reject(error);
     }
 
     if (error.response?.status === 401 && !originalRequest._retry) {

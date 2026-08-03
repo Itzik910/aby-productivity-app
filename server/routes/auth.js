@@ -102,15 +102,16 @@ router.post('/register', registerValidation, async (req, res) => {
 
     await user.save();
 
-    // Send verification email (if email is configured)
+    // Send verification email (if email is configured). Fire-and-forget —
+    // a slow/hanging SMTP connection must never delay the HTTP response:
+    // that delay is what pushes the client past its request timeout, which
+    // then (from the client's perspective) looks like registration failed
+    // even though the user was already created here.
     if (transporter) {
       const verificationUrl = `${process.env.CLIENT_URL}/verify-email?token=${verificationToken}`;
-      try {
-        await sendVerificationEmail(user.email, user.name, verificationUrl);
-      } catch (emailError) {
-        // Email failure shouldn t block successful registration – log and continue
+      sendVerificationEmail(user.email, user.name, verificationUrl).catch((emailError) => {
         console.error('Email sending failed (continuing without interruption):', emailError.message);
-      }
+      });
     }
 
     // Generate tokens

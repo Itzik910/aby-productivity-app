@@ -77,6 +77,15 @@ interface RegisterData {
   };
 }
 
+// A confused double-tap (or, previously, the axios cold-start retry
+// interceptor blindly replaying a POST) could fire login/register twice
+// concurrently — the second call would then legitimately be rejected as
+// "already exists"/invalid credentials even though the first was working.
+// These dedupe concurrent calls to a single in-flight promise, the same
+// pattern already used for token refresh in api.ts.
+let loginInFlight: Promise<void> | null = null;
+let registerInFlight: Promise<void> | null = null;
+
 export const useAuthStore = create<AuthState & AuthActions>()(
   persist(
     (set, get) => ({
@@ -89,76 +98,91 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       error: null,
 
       // Actions
-      login: async (email: string, password: string) => {
-        set({ isLoading: true, error: null });
-        
-        console.log('[AUTH STORE] Starting login with email:', email);
-        
-        try {
-          console.log('[AUTH STORE] Making API call to /auth/login');
-          const response = await api.post('/auth/login', { email, password });
-          console.log('[AUTH STORE] Login API response received:', response.status, response.data);
-          const { user, token, refreshToken } = response.data.data;
-          
-          console.log('[AUTH STORE] Setting auth state with user:', user);
-          set({
-            user,
-            token,
-            refreshToken,
-            isAuthenticated: true,
-            isLoading: false,
-            error: null,
-          });
+      login: (email: string, password: string) => {
+        if (loginInFlight) return loginInFlight;
 
-          // Set auth header for future requests
-          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-          console.log('[AUTH STORE] Login completed successfully');
-        } catch (error: any) {
-          console.error('[AUTH STORE] Login failed with error:', error);
-          console.error('[AUTH STORE] Login error response:', error.response?.data);
-          console.error('[AUTH STORE] Login error status:', error.response?.status);
-          set({
-            isLoading: false,
-            error: error.response?.data?.message || 'Login failed',
-          });
-          throw error;
-        }
+        set({ isLoading: true, error: null });
+        console.log('[AUTH STORE] Starting login with email:', email);
+
+        loginInFlight = (async () => {
+          try {
+            console.log('[AUTH STORE] Making API call to /auth/login');
+            const response = await api.post('/auth/login', { email, password });
+            console.log('[AUTH STORE] Login API response received:', response.status, response.data);
+            const { user, token, refreshToken } = response.data.data;
+
+            console.log('[AUTH STORE] Setting auth state with user:', user);
+            set({
+              user,
+              token,
+              refreshToken,
+              isAuthenticated: true,
+              isLoading: false,
+              error: null,
+            });
+
+            // Set auth header for future requests
+            api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+            console.log('[AUTH STORE] Login completed successfully');
+          } catch (error: any) {
+            console.error('[AUTH STORE] Login failed with error:', error);
+            console.error('[AUTH STORE] Login error response:', error.response?.data);
+            console.error('[AUTH STORE] Login error status:', error.response?.status);
+            set({
+              isLoading: false,
+              error: error.response?.data?.message || 'Login failed',
+            });
+            throw error;
+          } finally {
+            loginInFlight = null;
+          }
+        })();
+
+        return loginInFlight;
       },
 
-      register: async (userData: RegisterData) => {
+      register: (userData: RegisterData) => {
+        if (registerInFlight) return registerInFlight;
+
         set({ isLoading: true, error: null });
         
         console.log('[AUTH STORE] Starting registration with data:', userData);
-        
-        try {
-          console.log('[AUTH STORE] Making API call to /auth/register');
-          const response = await api.post('/auth/register', userData);
-          console.log('[AUTH STORE] API response received:', response.status, response.data);
-          const { user, token, refreshToken } = response.data.data;
-          
-          console.log('[AUTH STORE] Setting auth state with user:', user);
-          set({
-            user,
-            token,
-            refreshToken,
-            isAuthenticated: true,
-            isLoading: false,
-            error: null,
-          });
 
-          // Set auth header for future requests
-          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-          console.log('[AUTH STORE] Registration completed successfully');
-        } catch (error: any) {
-          console.error('[AUTH STORE] Registration failed with error:', error);
-          console.error('[AUTH STORE] Error response:', error.response?.data);
-          console.error('[AUTH STORE] Error status:', error.response?.status);
-          set({
-            isLoading: false,
-            error: error.response?.data?.message || 'Registration failed',
-          });
-          throw error;
-        }
+        registerInFlight = (async () => {
+          try {
+            console.log('[AUTH STORE] Making API call to /auth/register');
+            const response = await api.post('/auth/register', userData);
+            console.log('[AUTH STORE] API response received:', response.status, response.data);
+            const { user, token, refreshToken } = response.data.data;
+
+            console.log('[AUTH STORE] Setting auth state with user:', user);
+            set({
+              user,
+              token,
+              refreshToken,
+              isAuthenticated: true,
+              isLoading: false,
+              error: null,
+            });
+
+            // Set auth header for future requests
+            api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+            console.log('[AUTH STORE] Registration completed successfully');
+          } catch (error: any) {
+            console.error('[AUTH STORE] Registration failed with error:', error);
+            console.error('[AUTH STORE] Error response:', error.response?.data);
+            console.error('[AUTH STORE] Error status:', error.response?.status);
+            set({
+              isLoading: false,
+              error: error.response?.data?.message || 'Registration failed',
+            });
+            throw error;
+          } finally {
+            registerInFlight = null;
+          }
+        })();
+
+        return registerInFlight;
       },
 
       logout: () => {
