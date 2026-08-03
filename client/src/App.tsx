@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Toaster, toast } from 'react-hot-toast';
 
 // i18n — must be imported before any component that uses translations
@@ -89,6 +89,29 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Public routes never show the mobile app chrome (bottom tab bar, compose/
+// detail sheets, onboarding tour) even if the visiting user happens to
+// already be authenticated — that chrome belongs to the logged-in app shell,
+// not the landing/auth screens.
+const PUBLIC_ROUTES = ['/', '/login', '/register', '/forgot-password'];
+
+// Rendered as a sibling of <Routes> inside <Router> so it can call
+// useLocation() (App itself renders <Router>, so it can't call the hook
+// directly in its own body).
+const MobileChrome: React.FC<{ isAuthenticated: boolean }> = ({ isAuthenticated }) => {
+  const location = useLocation();
+  if (!isAuthenticated || PUBLIC_ROUTES.includes(location.pathname)) return null;
+
+  return (
+    <div className="md:hidden">
+      <MobileTabBar />
+      <ComposeSheet />
+      <TaskDetailSheet />
+      <OnboardingTour />
+    </div>
+  );
+};
+
 function App() {
   const { isLoading, logout, isAuthenticated } = useAuthStore();
   const { theme } = useThemeStore();
@@ -174,14 +197,7 @@ function App() {
         />
 
         {/* Mobile-only bottom nav + global sheets + onboarding tour */}
-        {isAuthenticated && (
-          <div className="md:hidden">
-            <MobileTabBar />
-            <ComposeSheet />
-            <TaskDetailSheet />
-            <OnboardingTour />
-          </div>
-        )}
+        <MobileChrome isAuthenticated={isAuthenticated} />
 
         <Routes>
           {/* Public Routes */}

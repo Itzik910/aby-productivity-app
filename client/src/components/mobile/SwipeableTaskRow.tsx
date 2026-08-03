@@ -131,6 +131,9 @@ const SwipeableTaskRow: React.FC<SwipeableTaskRowProps> = ({ task, onPostpone, o
     Boolean
   );
 
+  const stepsTotal = task.steps?.length || 0;
+  const stepsDone = task.steps?.filter((s) => s.isCompleted).length || 0;
+
   return (
     <div className="relative overflow-hidden rounded-2xl">
       <motion.div
@@ -163,6 +166,25 @@ const SwipeableTaskRow: React.FC<SwipeableTaskRowProps> = ({ task, onPostpone, o
           <p className="truncate text-[15px] font-semibold text-aby-ink dark:text-aby-ink-dark">{task.title}</p>
           <p className="mt-0.5 truncate text-xs font-medium text-aby-muted dark:text-aby-muted-dark">{metaBits.join(' · ')}</p>
         </div>
+        {stepsTotal > 0 && (
+          <div className="flex shrink-0 items-center gap-1.5 rounded-full bg-aby-page px-2 py-1 dark:bg-aby-page-dark">
+            <div className="flex items-center gap-[3px]">
+              {Array.from({ length: Math.min(stepsTotal, 4) }).map((_, i) => (
+                <span
+                  key={i}
+                  className={`h-[5px] w-[5px] rounded-full ${
+                    i < Math.round((stepsDone / stepsTotal) * Math.min(stepsTotal, 4))
+                      ? 'bg-aby-violet dark:bg-aby-violet-dark'
+                      : 'bg-aby-line dark:bg-aby-line-dark'
+                  }`}
+                />
+              ))}
+            </div>
+            <span className="text-[10.5px] font-bold text-aby-sub dark:text-aby-sub-dark">
+              {stepsDone}/{stepsTotal}
+            </span>
+          </div>
+        )}
       </motion.div>
     </div>
   );

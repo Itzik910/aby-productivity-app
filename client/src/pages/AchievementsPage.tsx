@@ -16,6 +16,7 @@ import {
   Lock
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useAuthStore } from '../stores/authStore';
 
 const TIER_STYLE: Record<string, string> = {
   bronze: '#B4531A',
@@ -47,6 +48,7 @@ interface Achievement {
 
 const AchievementsPage: React.FC = () => {
   const { t } = useTranslation();
+  const user = useAuthStore((s) => s.user);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [userStats] = useState({
     totalXP: 2450,
@@ -226,9 +228,28 @@ const AchievementsPage: React.FC = () => {
     return (progress / maxProgress) * 100;
   };
 
-  const rankedByProgress = [...achievements].sort(
-    (a, b) => b.progress / b.maxProgress - a.progress / a.maxProgress
-  );
+  // Real, server-persisted achievements (currently just "closed today's
+  // ring") are unlocked-only — they're pinned to the top rather than mixed
+  // into the progress sort below, which only applies to the mock catalog.
+  const realAchievements: Achievement[] = (user?.achievements || []).map((a) => ({
+    id: `real-${a.type}-${a.earnedAt}`,
+    title: a.name,
+    description: a.description || '',
+    icon: <Flame className="w-6 h-6" />,
+    category: 'streak',
+    difficulty: 'gold',
+    progress: 1,
+    maxProgress: 1,
+    unlocked: true,
+    unlockedAt: new Date(a.earnedAt),
+    xpReward: a.points,
+    color: 'text-orange-600',
+  }));
+
+  const rankedByProgress = [
+    ...realAchievements,
+    ...[...achievements].sort((a, b) => b.progress / b.maxProgress - a.progress / a.maxProgress),
+  ];
 
   return (
     <>

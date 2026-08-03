@@ -83,3 +83,49 @@ describe('GET /tasks/:id/five-ways', () => {
     expect([200, 500]).toContain(response.status);
   });
 });
+
+describe('POST /tasks/daily-ring-complete', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const buildMockUser = (achievements = []) => ({
+    _id: 'user-123',
+    achievements,
+    save: jest.fn().mockResolvedValue(undefined),
+    getPublicProfile: jest.fn().mockReturnValue({ _id: 'user-123', achievements }),
+  });
+
+  it('grants the achievement the first time it is called today', async () => {
+    const mockUser = buildMockUser([]);
+    User.findById.mockResolvedValue(mockUser);
+
+    const app = buildApp();
+    const response = await request(app).post('/api/tasks/daily-ring-complete');
+
+    expect(response.status).toBe(200);
+    expect(mockUser.save).toHaveBeenCalledTimes(1);
+    expect(mockUser.achievements.some((a) => a.type === 'daily_ring')).toBe(true);
+  });
+
+  it('does not grant a duplicate achievement the same day', async () => {
+    const mockUser = buildMockUser([
+      { type: 'daily_ring', name: 'x', earnedAt: new Date(), points: 50 },
+    ]);
+    User.findById.mockResolvedValue(mockUser);
+
+    const app = buildApp();
+    const response = await request(app).post('/api/tasks/daily-ring-complete');
+
+    expect(response.status).toBe(200);
+    expect(mockUser.save).not.toHaveBeenCalled();
+    expect(mockUser.achievements).toHaveLength(1);
+  });
+
+  it('returns 404 when the user cannot be found', async () => {
+    User.findById.mockResolvedValue(null);
+
+    const app = buildApp();
+    const response = await request(app).post('/api/tasks/daily-ring-complete');
+
+    expect(response.status).toBe(404);
+  });
+});

@@ -146,6 +146,9 @@ const he = {
       streak: 'רצף של {{n}} ימים',
       askPlaceholder: 'מה סוגרים היום?',
       ask: 'שאל',
+      modeSingle: 'משימה אחת',
+      modeMultiple: 'ריבוי משימות',
+      abySplit: 'ABY split',
       upNow: 'עכשיו',
       openCount: '{{n}} פתוחות',
       open: 'פתח',
@@ -203,6 +206,7 @@ const he = {
       almost: 'עוד רגע שם',
       xpToNext: '{{n}} לרמה {{level}}',
       unlockedLine: '{{unlocked}} מתוך {{total}} נפתחו · {{pct}}% הושלמו',
+      dailyRingToast: 'סגרת את הטבעת של היום! הישג חדש נפתח',
     },
     challenges: {
       title: 'אתגרים',

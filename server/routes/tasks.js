@@ -42,6 +42,7 @@ router.post('/ai-parse', auth, checkAIUsageLimit, async (req, res) => {
 
   try {
     const prompt = (req.body && req.body.prompt ? String(req.body.prompt) : '').trim();
+    const forceSplit = !!(req.body && req.body.forceSplit);
     if (!prompt) {
       send('error', { message: 'Prompt is required' });
       return res.end();
@@ -60,7 +61,8 @@ router.post('/ai-parse', auth, checkAIUsageLimit, async (req, res) => {
     const parsed = await aiService.streamParseTasks(
       prompt,
       (event, message) => send(event, { message }),
-      userContext
+      userContext,
+      { forceSplit }
     );
 
     if (!parsed.length) {
@@ -90,6 +92,46 @@ router.post('/ai-parse', auth, checkAIUsageLimit, async (req, res) => {
     console.error('ai-parse SSE error:', error.message);
     send('error', { message: error.message || 'Failed to parse tasks' });
     return res.end();
+  }
+});
+
+// POST /api/tasks/daily-ring-complete
+// Grants the "closed today's ring" achievement the first time it's called on
+// a given calendar day; safe to call more than once (e.g. duplicate client
+// fires from a race) — subsequent calls on the same day are a no-op.
+router.post('/daily-ring-complete', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const now = new Date();
+    const isSameDay = (d) =>
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate();
+
+    const alreadyEarnedToday = (user.achievements || []).some(
+      (a) => a.type === 'daily_ring' && a.earnedAt && isSameDay(new Date(a.earnedAt))
+    );
+
+    if (!alreadyEarnedToday) {
+      user.achievements.push({
+        type: 'daily_ring',
+        name: 'טבעת היום נסגרה',
+        description: 'השלמת את כל המשימות שתוכננו להיום',
+        icon: 'flame',
+        earnedAt: now,
+        points: 50
+      });
+      await user.save();
+    }
+
+    res.json(user.getPublicProfile());
+  } catch (error) {
+    console.error('Error granting daily ring achievement:', error.message);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
