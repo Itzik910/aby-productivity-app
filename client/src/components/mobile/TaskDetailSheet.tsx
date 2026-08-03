@@ -54,7 +54,14 @@ const TaskDetailSheet: React.FC = () => {
     const path = step.isCompleted ? 'uncomplete' : 'complete';
     try {
       const res = await api.patch(`/tasks/${task._id}/steps/${index}/${path}`);
-      setTask(res.data);
+      let updated = res.data;
+      // Checking off the last remaining step is how the user finishes an
+      // "ABY split" task — carry that through to actually completing it.
+      if (path === 'complete' && updated.steps?.length && updated.steps.every((s: { isCompleted: boolean }) => s.isCompleted)) {
+        const completedRes = await api.patch(`/tasks/${task._id}/complete`);
+        updated = completedRes.data;
+      }
+      setTask(updated);
       refresh();
     } catch {
       // Non-fatal — the sheet just keeps its previous state.

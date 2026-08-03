@@ -53,9 +53,9 @@ export function useTaskStream() {
   const abortRef = useRef<AbortController | null>(null);
 
   const submit = useCallback(
-    async (prompt: string) => {
+    async (prompt: string, options?: { forceMultiple?: boolean }): Promise<AgentTask[] | undefined> => {
       const trimmed = prompt.trim();
-      if (!trimmed) return;
+      if (!trimmed) return undefined;
 
       abortRef.current?.abort();
       const controller = new AbortController();
@@ -79,9 +79,11 @@ export function useTaskStream() {
             'Content-Type': 'application/json',
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-          body: JSON.stringify({ prompt: trimmed }),
+          body: JSON.stringify({ prompt: trimmed, forceSplit: !!options?.forceMultiple }),
           signal: controller.signal,
         });
+
+      let createdTasks: AgentTask[] | undefined;
 
       try {
         let res = await doFetch(getAuthToken());
@@ -118,6 +120,7 @@ export function useTaskStream() {
               setStreamMessage(data?.message || '');
             } else if (event === 'success') {
               const tasks: AgentTask[] = data?.tasks || [];
+              createdTasks = tasks;
               addTasks(tasks);
               setStreaming(false);
               // Same signal CreateTaskModal already dispatches, so any page
@@ -138,6 +141,8 @@ export function useTaskStream() {
         setStreaming(false);
         abortRef.current = null;
       }
+
+      return createdTasks;
     },
     [setStreaming, setStreamMessage, addTasks, setError]
   );

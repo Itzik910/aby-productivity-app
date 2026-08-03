@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'react-hot-toast';
 import { Sparkles, Navigation, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
 import { useLanguageStore } from '../stores/languageStore';
@@ -12,6 +13,8 @@ import TaskCard from '../components/TaskCard';
 import FixMyDayModal from '../components/FixMyDayModal';
 import SwipeableTaskRow from '../components/mobile/SwipeableTaskRow';
 import MobileProfileAvatar from '../components/mobile/MobileProfileAvatar';
+import DailyRing from '../components/mobile/DailyRing';
+import AskAbyCard from '../components/mobile/AskAbyCard';
 import {
   MobileTask,
   isSameDay,
@@ -26,11 +29,11 @@ const DashboardPage: React.FC = () => {
   const { t } = useTranslation();
   const { isRtl } = useLanguageStore();
   const user = useAuthStore((s) => s.user);
+  const updateUser = useAuthStore((s) => s.updateUser);
   const tasks = useTaskStore((s) => s.tasks);
   const setTasks = useTaskStore((s) => s.setTasks);
   const [loading, setLoading] = useState(true);
   const [showFixMyDay, setShowFixMyDay] = useState(false);
-  const openCompose = useMobileUiStore((s) => s.openCompose);
   const openDetail = useMobileUiStore((s) => s.openDetail);
 
   // Mobile Today tab needs the classic Task shape (dueDate/steps/priority) —
@@ -120,11 +123,10 @@ const DashboardPage: React.FC = () => {
   }, [setTasks]);
 
   const now = new Date();
-  // The progress ring stays scoped to today's plan (X of Y done today).
+  // The daily ring stays scoped to today's plan (X of Y done today).
   const todayTasks = mobileTasks.filter((mt) => isSameDay(new Date(mt.dueDate), now));
   const doneCount = todayTasks.filter(isTaskDone).length;
   const totalCount = todayTasks.length;
-  const pct = totalCount ? Math.round((doneCount / totalCount) * 100) : 0;
   // The swipeable list below it shows every open task regardless of date —
   // "not now" (swipe right) is what keeps it out of view, not its due date.
   const openTasks = mobileTasks.filter((mt) => !isTaskDone(mt) && !isHiddenNow(mt, now));
@@ -137,68 +139,49 @@ const DashboardPage: React.FC = () => {
   const hour = now.getHours();
   const greetKey = hour < 12 ? 'greeting_morning' : hour < 18 ? 'greeting_afternoon' : 'greeting_evening';
 
+  // Closing every segment of the daily ring grants a real, server-persisted
+  // achievement (idempotent per calendar day — the server guards against a
+  // double-fire, this is just avoiding redundant requests in-session).
+  const handleRingClosed = useCallback(async () => {
+    try {
+      const res = await api.post('/tasks/daily-ring-complete');
+      if (res.data?.achievements) {
+        updateUser({ achievements: res.data.achievements });
+        toast.success(t('mobile.achievements.dailyRingToast') as string, { icon: '🔥' });
+      }
+    } catch {
+      // Non-fatal — worst case the achievement is granted next time the ring closes.
+    }
+  }, [updateUser, t]);
+
   return (
     <>
       {/* ---------- Mobile Today tab ---------- */}
       <div dir={isRtl ? 'rtl' : 'ltr'} className="min-h-screen bg-aby-page pb-24 dark:bg-aby-page-dark md:hidden">
         <div className="px-5 pt-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-xs font-bold uppercase tracking-wide text-aby-muted dark:text-aby-muted-dark">
-                {dateLine}
-              </div>
-              <h1 className="mt-0.5 text-[23px] font-extrabold text-aby-ink dark:text-aby-ink-dark">
-                {t(`dashboard.${greetKey}`)}
-              </h1>
+          <div>
+            <div className="text-xs font-bold uppercase tracking-wide text-aby-muted dark:text-aby-muted-dark">
+              {dateLine}
             </div>
+            <h1 className="mt-0.5 text-[23px] font-extrabold text-aby-ink dark:text-aby-ink-dark">
+              {t(`dashboard.${greetKey}`)}
+            </h1>
+            {streak > 0 && (
+              <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-[#EDE8FE] px-2.5 py-1 dark:bg-[#2E2A4A]">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                <span className="text-xs font-bold text-aby-violet dark:text-aby-violet-dark">{t('mobile.today.streak', { n: streak })}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Avatar / daily-ring row — mirrored pair, opposite ends */}
+          <div className="mt-4 flex items-center justify-between">
             <MobileProfileAvatar />
+            <DailyRing completed={doneCount} total={totalCount} onRingClosed={handleRingClosed} />
           </div>
 
-          {/* Progress card */}
-          <div
-            className="mt-4 rounded-[22px] p-[18px] text-white shadow-[0_14px_30px_-14px_rgba(91,75,224,0.7)]"
-            style={{ background: 'linear-gradient(135deg,#5B4BE0 0%,#6C4AE4 55%,#4436C6 100%)' }}
-          >
-            <div className="flex items-center gap-4">
-              <div
-                className="relative flex h-[74px] w-[74px] shrink-0 items-center justify-center rounded-full"
-                style={{ background: `conic-gradient(#7BF1A8 ${Math.round(pct * 3.6)}deg, rgba(255,255,255,.22) 0)` }}
-              >
-                <div className="flex h-[58px] w-[58px] items-center justify-center rounded-full bg-[#5F4DE2] text-base font-extrabold">
-                  {pct}%
-                </div>
-              </div>
-              <div className="min-w-0">
-                <div className="text-[17px] font-extrabold leading-tight">
-                  {t('mobile.today.doneOf', { done: doneCount, total: totalCount })}
-                </div>
-                <div className="mt-0.5 text-[13px] font-medium text-white/75">{t('mobile.today.smallSteps')}</div>
-                {streak > 0 && (
-                  <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-                    <span className="text-xs font-bold">{t('mobile.today.streak', { n: streak })}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Ask ABY bar */}
-          <button
-            data-tour="ask-bar"
-            onClick={openCompose}
-            className="mt-3.5 flex h-14 w-full items-center gap-3 rounded-[18px] border border-aby-line bg-aby-card px-2.5 shadow-sm dark:border-aby-line-dark dark:bg-aby-card-dark"
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EDE8FE] text-aby-violet dark:bg-[#2E2A4A] dark:text-aby-violet-dark">
-              <Sparkles className="h-[19px] w-[19px]" />
-            </span>
-            <span className="flex-1 truncate text-start text-[14.5px] font-medium text-aby-sub dark:text-aby-sub-dark">
-              {t('mobile.today.askPlaceholder')}
-            </span>
-            <span className="shrink-0 rounded-xl bg-aby-ink px-3.5 py-2 text-[12.5px] font-bold text-white dark:bg-white dark:text-aby-ink">
-              {t('mobile.today.ask')}
-            </span>
-          </button>
+          {/* Inline ABY composer */}
+          <AskAbyCard />
 
           {mobileLoading ? (
             <div className="flex items-center justify-center gap-2 py-14 text-aby-muted dark:text-aby-muted-dark">

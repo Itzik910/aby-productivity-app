@@ -146,6 +146,9 @@ const en = {
       streak: '{{n}}-day streak',
       askPlaceholder: 'What are we closing today?',
       ask: 'Ask',
+      modeSingle: 'Single',
+      modeMultiple: 'Multiple',
+      abySplit: 'ABY split',
       upNow: 'UP NOW',
       openCount: '{{n}} open',
       open: 'Open',
@@ -203,6 +206,7 @@ const en = {
       almost: 'ALMOST THERE',
       xpToNext: '{{n}} to level {{level}}',
       unlockedLine: '{{unlocked}} of {{total}} unlocked · {{pct}}% complete',
+      dailyRingToast: "You closed today's ring! New achievement unlocked",
     },
     challenges: {
       title: 'Challenges',

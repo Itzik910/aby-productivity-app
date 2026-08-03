@@ -810,17 +810,25 @@ INPUT: "${text.replace(/"/g, '\\"')}"`;
    * @param {string} userPrompt - raw free-text prompt from the user
    * @param {(event: string, message: string) => void} onChunk - progress callback
    * @param {string} [userContext] - dynamic user-profile context string to inject
+   * @param {{forceSplit?: boolean}} [opts] - forceSplit: the user explicitly
+   *   flagged this prompt as containing multiple distinct tasks (the
+   *   "Multiple" toggle), so the model must return more than one task even
+   *   if it would otherwise have treated the input as a single task.
    * @returns {Promise<Array>} normalized task objects
    */
-  async streamParseTasks(userPrompt, onChunk = () => {}, userContext = '') {
+  async streamParseTasks(userPrompt, onChunk = () => {}, userContext = '', opts = {}) {
     const prompt = String(userPrompt || '').trim();
     if (!prompt) return [];
 
     // Inject dynamic user context ahead of the base system prompt so the model
     // knows exactly who it is generating cards for.
-    const systemContent = userContext
+    let systemContent = userContext
       ? `${userContext}\n\n${ABY_AGENT_SYSTEM_PROMPT}`
       : ABY_AGENT_SYSTEM_PROMPT;
+
+    if (opts.forceSplit) {
+      systemContent += `\n\nIMPORTANT: The user explicitly indicated this input contains MULTIPLE distinct tasks. You MUST return more than one task object — split the input into as many separate, sensible tasks as it actually contains, even if the boundaries are implicit rather than marked by punctuation.`;
+    }
 
     if (!openai) {
       onChunk('progress', 'מחפש מחירים והצעות בקרבת מקום...');

@@ -30,6 +30,14 @@ export interface User {
     totalPoints: number;
     level: number;
   };
+  achievements?: Array<{
+    type: string;
+    name: string;
+    description?: string;
+    icon?: string;
+    earnedAt: string;
+    points: number;
+  }>;
   preferences: {
     theme: 'light' | 'dark' | 'auto';
     language: string;
