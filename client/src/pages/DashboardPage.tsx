@@ -11,6 +11,7 @@ import HeroInput from '../components/HeroInput';
 import TaskCard from '../components/TaskCard';
 import FixMyDayModal from '../components/FixMyDayModal';
 import SwipeableTaskRow from '../components/mobile/SwipeableTaskRow';
+import MobileProfileAvatar from '../components/mobile/MobileProfileAvatar';
 import {
   MobileTask,
   isSameDay,
@@ -150,9 +151,7 @@ const DashboardPage: React.FC = () => {
                 {t(`dashboard.${greetKey}`)}
               </h1>
             </div>
-            <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-[#EDE8FE] text-[15px] font-extrabold text-aby-violet dark:bg-[#2E2A4A] dark:text-aby-violet-dark">
-              {(user?.name || '?').charAt(0).toUpperCase()}
-            </div>
+            <MobileProfileAvatar />
           </div>
 
           {/* Progress card */}

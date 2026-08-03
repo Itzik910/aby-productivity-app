@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast';
 
 // i18n — must be imported before any component that uses translations
 import './i18n';
@@ -104,6 +104,16 @@ function App() {
     window.addEventListener('aby:force-logout', handler);
     return () => window.removeEventListener('aby:force-logout', handler);
   }, [logout]);
+
+  // The API interceptor fires this when a request timed out with no response
+  // at all — almost always our free-tier host waking up from sleep — right
+  // before it silently retries with a longer timeout. Let the user know
+  // rather than leaving them staring at a stuck spinner.
+  React.useEffect(() => {
+    const handler = () => toast('מעיר את השרת… זה יכול לקחת עד דקה', { icon: '⏳', duration: 6000 });
+    window.addEventListener('aby:server-waking', handler);
+    return () => window.removeEventListener('aby:server-waking', handler);
+  }, []);
 
   // Apply theme to document (supports 'auto' via prefers-color-scheme)
   React.useEffect(() => {

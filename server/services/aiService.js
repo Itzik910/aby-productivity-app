@@ -12,6 +12,9 @@ General Instruction: You are a smart personal assistant named ABY. Your task is 
 
 Important JSON formatting rule: All JSON keys must be in English, but the actual text content/values (titles, descriptions, summaries, badges) MUST be in Hebrew.
 
+CRITICAL - Splitting multiple tasks: Hebrew speakers routinely chain several unrelated errands into one sentence with NO comma and NO "and" between them at all (the "ו" conjunction, when it's even used, is glued directly onto the next word as a prefix, e.g. "ולקבוע" not "ו לקבוע" — never rely on whitespace or punctuation to find it). A new task begins wherever a new distinct goal/action starts, even mid-sentence with zero separator. Read for INTENT, not punctuation.
+Example: "לקבוע תור לרופא שיניים לקנות פרחים ולקבוע טניס ליום שני ב 14" is THREE separate tasks: (1) "לקבוע תור לרופא שיניים", (2) "לקנות פרחים", (3) "לקבוע טניס ליום שני ב-14:00" — even though nothing but a shared verb pattern separates them. Never merge distinct errands into one task object just because they share a sentence.
+
 Part 1: The Tag Hierarchy and Categories
 A. [Category: ACTIONABLE] – Tasks requiring a purchase, service, or visiting a business.
 - Tag: PURCHASE_PRODUCT (e.g., buy flowers, paint). -> deepLink expectation: Direct shopping link (e.g., Zer4U, KSP, ZAP).
@@ -881,9 +884,17 @@ INPUT: "${text.replace(/"/g, '\\"')}"`;
 
   _streamParseFallback(prompt) {
     // Split on common Hebrew/English separators so multi-task prompts still yield
-    // multiple cards even without an LLM available.
+    // multiple cards even without an LLM available. Hebrew's "and" (ו) is a
+    // prefix glued directly onto the next word (e.g. "ולקבוע", never "ו לקבוע"),
+    // so a standalone \bו\b (the old pattern) never matches real text — match
+    // the "ו" + infinitive-marker "ל" combination as a word-start instead
+    // (e.g. "ולקנות", "ולסדר"). Deliberately narrower than splitting on any
+    // ל-word: bare ל is also the "to/for" preposition (e.g. "לרופא"), which
+    // is part of the *same* task, not a new one — this fallback can't reason
+    // about that the way the real model (see ABY_AGENT_SYSTEM_PROMPT) can, so
+    // it only acts on the unambiguous "ול" conjunction+infinitive signal.
     const chunks = prompt
-      .split(/\s*(?:,|;|\band\b|\bו\b|\n)\s*/i)
+      .split(/\s*(?:,|;|\band\b|\n)\s*|\s+ו(?=ל[א-ת]{2,})/i)
       .map((s) => s.trim())
       .filter(Boolean)
       .slice(0, 5);

@@ -8,9 +8,12 @@ const TOUR_TARGETS = ['ask-bar', 'up-now', 'add-fab', 'you-tab'];
 
 /**
  * Welcome sheet + 4-step spotlight overlay. Targets are found at runtime via
- * data-tour="..." attributes on the real Today screen / bottom nav elements
- * (getBoundingClientRect), rather than hard-coded pixel offsets — our layout
- * doesn't match the original design mock's exact geometry.
+ * data-tour="..." attributes on the real Today screen (the tour always runs
+ * from /dashboard, so it can rely on data-tour="you-tab" living on the
+ * profile-avatar circle there even though that element also appears on
+ * other screens) and bottom nav (getBoundingClientRect), rather than
+ * hard-coded pixel offsets — our layout doesn't match the original design
+ * mock's exact geometry.
  */
 const OnboardingTour: React.FC = () => {
   const { t } = useTranslation();

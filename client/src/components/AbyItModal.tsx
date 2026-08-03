@@ -73,7 +73,7 @@ const AbyItModal: React.FC<AbyItModalProps> = ({ taskId, initial, onClose, onRes
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
           dir={isRtl ? 'rtl' : 'ltr'}
-          className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl dark:bg-aby-card-dark"
+          className="max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-aby-card-dark"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mb-4 flex items-center justify-between">

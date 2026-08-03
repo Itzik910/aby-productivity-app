@@ -6,6 +6,7 @@ import { api } from '../services/api';
 import toast from 'react-hot-toast';
 import { last7Days } from '../utils/habitDisplay';
 import HabitCheckRing from '../components/mobile/HabitCheckRing';
+import MobileProfileAvatar from '../components/mobile/MobileProfileAvatar';
 
 interface Habit {
   _id: string;
@@ -121,7 +122,10 @@ const HabitsPage: React.FC = () => {
       <div className="min-h-screen bg-aby-page pb-24 dark:bg-aby-page-dark md:hidden">
         <div className="px-5 pt-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-[21px] font-extrabold text-aby-ink dark:text-aby-ink-dark">{t('mobile.habits.title')}</h1>
+            <div className="flex items-center gap-3">
+              <MobileProfileAvatar />
+              <h1 className="text-[21px] font-extrabold text-aby-ink dark:text-aby-ink-dark">{t('mobile.habits.title')}</h1>
+            </div>
             <button
               onClick={() => setShowCreate(true)}
               className="h-[42px] rounded-2xl bg-aby-violet px-4 text-[13px] font-bold text-white"

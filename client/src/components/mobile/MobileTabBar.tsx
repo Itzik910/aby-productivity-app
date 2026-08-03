@@ -1,10 +1,8 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, ListChecks, CalendarDays, User, Plus } from 'lucide-react';
+import { Home, ListChecks, Sprout, Target, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMobileUiStore } from '../../stores/mobileUiStore';
-
-const YOU_PATHS = ['/you', '/habits', '/achievements', '/challenges', '/premium', '/settings'];
 
 const MobileTabBar: React.FC = () => {
   const { t } = useTranslation();
@@ -14,13 +12,17 @@ const MobileTabBar: React.FC = () => {
 
   const isActive = (paths: string[]) => paths.includes(location.pathname);
 
+  // "אני" moved to the profile-avatar circle on every screen (see
+  // MobileProfileAvatar) instead of taking its own tab, and Tasks/Calendar
+  // merged into one tab with a List/Calendar toggle — both freed up a nav
+  // slot, now used for direct access to Habits and Challenges.
   const tabs: Array<{ key: string; label: string; icon: React.ReactNode; paths: string[] }> = [
     { key: 'today', label: t('mobile.nav.today'), icon: <Home className="h-[21px] w-[21px]" />, paths: ['/dashboard'] },
-    { key: 'tasks', label: t('mobile.nav.tasks'), icon: <ListChecks className="h-[21px] w-[21px]" />, paths: ['/tasks'] },
+    { key: 'tasks', label: t('mobile.nav.tasks'), icon: <ListChecks className="h-[21px] w-[21px]" />, paths: ['/tasks', '/calendar'] },
   ];
   const tabsRight: Array<{ key: string; label: string; icon: React.ReactNode; paths: string[] }> = [
-    { key: 'calendar', label: t('mobile.nav.calendar'), icon: <CalendarDays className="h-[21px] w-[21px]" />, paths: ['/calendar'] },
-    { key: 'you', label: t('mobile.nav.you'), icon: <User className="h-[21px] w-[21px]" />, paths: YOU_PATHS },
+    { key: 'habits', label: t('mobile.you.habits'), icon: <Sprout className="h-[21px] w-[21px]" />, paths: ['/habits'] },
+    { key: 'challenges', label: t('mobile.you.challenges'), icon: <Target className="h-[21px] w-[21px]" />, paths: ['/challenges'] },
   ];
 
   const tabClass = (active: boolean) =>
@@ -49,12 +51,7 @@ const MobileTabBar: React.FC = () => {
       </div>
 
       {tabsRight.map((tab) => (
-        <button
-          key={tab.key}
-          data-tour={tab.key === 'you' ? 'you-tab' : undefined}
-          onClick={() => navigate(tab.paths[0])}
-          className={tabClass(isActive(tab.paths))}
-        >
+        <button key={tab.key} onClick={() => navigate(tab.paths[0])} className={tabClass(isActive(tab.paths))}>
           {tab.icon}
           <span className="text-[10.5px] font-bold">{tab.label}</span>
         </button>
