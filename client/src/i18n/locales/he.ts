@@ -158,6 +158,8 @@ const he = {
     },
     tasks: {
       title: 'משימות',
+      viewList: 'רשימה',
+      viewCalendar: 'יומן',
       chipToday: 'היום',
       chipOverdue: 'באיחור',
       chipWeek: 'השבוע',

@@ -158,6 +158,8 @@ const en = {
     },
     tasks: {
       title: 'Tasks',
+      viewList: 'List',
+      viewCalendar: 'Calendar',
       chipToday: 'Today',
       chipOverdue: 'Overdue',
       chipWeek: 'This week',

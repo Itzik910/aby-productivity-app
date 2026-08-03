@@ -27,6 +27,7 @@ import { useAuthStore } from '../stores/authStore';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
+import MobileProfileAvatar from '../components/mobile/MobileProfileAvatar';
 
 interface Challenge {
   _id: string;
@@ -408,8 +409,13 @@ const ChallengesPage: React.FC = () => {
       {/* ---------- Mobile card layout ---------- */}
       <div className="min-h-screen bg-aby-page pb-24 dark:bg-aby-page-dark md:hidden">
         <div className="px-5 pt-4">
-          <h1 className="text-[21px] font-extrabold text-aby-ink dark:text-aby-ink-dark">{t('mobile.challenges.title')}</h1>
-          <p className="mt-1.5 text-[13px] font-medium text-aby-sub dark:text-aby-sub-dark">{t('mobile.challenges.intro')}</p>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h1 className="text-[21px] font-extrabold text-aby-ink dark:text-aby-ink-dark">{t('mobile.challenges.title')}</h1>
+              <p className="mt-1.5 text-[13px] font-medium text-aby-sub dark:text-aby-sub-dark">{t('mobile.challenges.intro')}</p>
+            </div>
+            <MobileProfileAvatar />
+          </div>
 
           <div className="mt-4 flex flex-col gap-3">
             {getFilteredChallenges().map((challenge) => {

@@ -28,7 +28,7 @@ import {
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
 import { useTaskModalStore } from '../stores/taskModalStore';
-import MobileTasksView from '../components/mobile/MobileTasksView';
+import MobileTasksHub from '../components/mobile/MobileTasksHub';
 import AbyItModal from '../components/AbyItModal';
 import { MobileTask, isTaskDone } from '../utils/taskDisplay';
 import { AbyItState } from '../types/abyIt';
@@ -431,7 +431,7 @@ const TasksPage: React.FC = () => {
 
   return (
     <>
-      <MobileTasksView tasks={tasks as unknown as MobileTask[]} onToggle={toggleTaskMobile} />
+      <MobileTasksHub tasks={tasks as unknown as MobileTask[]} onToggle={toggleTaskMobile} />
       <div className="hidden min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 pt-12 md:block">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
