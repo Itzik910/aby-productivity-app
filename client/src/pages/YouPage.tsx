@@ -7,6 +7,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useLanguageStore } from '../stores/languageStore';
 import { useOnboardingStore } from '../stores/onboardingStore';
 import { Habit, isDoneToday, last7Days } from '../utils/habitDisplay';
+import HabitCheckRing from '../components/mobile/HabitCheckRing';
 
 const YouPage: React.FC = () => {
   const { t } = useTranslation();
@@ -15,6 +16,7 @@ const YouPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const startTour = useOnboardingStore((s) => s.start);
   const [habits, setHabits] = useState<Habit[]>([]);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   useEffect(() => {
     api
@@ -22,6 +24,24 @@ const YouPage: React.FC = () => {
       .then((res) => setHabits(res.data?.habits || []))
       .catch(() => {});
   }, []);
+
+  const toggleHabitToday = async (habit: Habit) => {
+    const done = isDoneToday(habit);
+    setTogglingId(habit._id);
+    try {
+      if (done) {
+        await api.delete(`/habits/${habit._id}/complete`);
+      } else {
+        await api.post(`/habits/${habit._id}/complete`);
+      }
+      const res = await api.get('/habits');
+      setHabits(res.data?.habits || []);
+    } catch {
+      // Non-fatal — the card just keeps its previous state.
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   const stats = user?.stats;
   const weekPct = stats && stats.totalTasks ? Math.round((stats.completedTasks / stats.totalTasks) * 100) : 0;
@@ -74,11 +94,20 @@ const YouPage: React.FC = () => {
 
         {habits.length > 0 && (
           <>
-            <div className="mb-2.5 mt-6 text-[11px] font-extrabold tracking-wide text-aby-muted dark:text-aby-muted-dark">
-              {t('mobile.you.sectionHabits')}
+            <div className="mb-2.5 mt-6 flex items-center justify-between">
+              <span className="text-[11px] font-extrabold tracking-wide text-aby-muted dark:text-aby-muted-dark">
+                {t('mobile.you.sectionHabits')}
+              </span>
+              <button
+                onClick={() => navigate('/habits')}
+                className="flex items-center gap-0.5 text-[11px] font-bold text-aby-violet dark:text-aby-violet-dark"
+              >
+                {t('mobile.you.habits')}
+                <ChevronRight className="rtl-flip h-3.5 w-3.5" />
+              </button>
             </div>
             <div className="flex flex-col gap-2.5">
-              {habits.slice(0, 2).map((h) => (
+              {habits.slice(0, 4).map((h) => (
                 <div
                   key={h._id}
                   className="flex items-center gap-3 rounded-2xl border border-aby-line bg-aby-card p-3.5 dark:border-aby-line-dark dark:bg-aby-card-dark"
@@ -90,16 +119,22 @@ const YouPage: React.FC = () => {
                     <p className="mt-0.5 text-xs font-semibold text-aby-muted dark:text-aby-muted-dark">
                       {h.currentStreak}
                     </p>
+                    <div className="mt-2 flex gap-1">
+                      {last7Days(h).map((done, i) => (
+                        <span
+                          key={i}
+                          className="h-[9px] w-[9px] rounded-[3px]"
+                          style={{ background: done ? h.color : '#E4E0F0' }}
+                        />
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex gap-1">
-                    {last7Days(h).map((done, i) => (
-                      <span
-                        key={i}
-                        className="h-[9px] w-[9px] rounded-[3px]"
-                        style={{ background: done ? h.color : '#E4E0F0' }}
-                      />
-                    ))}
-                  </div>
+                  <HabitCheckRing
+                    done={isDoneToday(h)}
+                    color={h.color}
+                    disabled={togglingId === h._id}
+                    onToggle={() => toggleHabitToday(h)}
+                  />
                 </div>
               ))}
             </div>

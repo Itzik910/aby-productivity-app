@@ -102,6 +102,21 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // A pure timeout/network error (no response at all) on the *first* call
+    // after the app loads is almost always our free-tier host spinning back
+    // up from sleep, which can take up to a minute — the 10s default timeout
+    // isn't a real failure there. Retry once with a much longer timeout
+    // instead of surfacing a scary "failed" message for what's just a cold
+    // start.
+    const isTimeoutOrNetworkError =
+      !error.response && (error.code === 'ECONNABORTED' || error.message === 'Network Error');
+    if (isTimeoutOrNetworkError && originalRequest && !originalRequest._coldStartRetry) {
+      originalRequest._coldStartRetry = true;
+      originalRequest.timeout = 60000;
+      window.dispatchEvent(new CustomEvent('aby:server-waking'));
+      return api(originalRequest);
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
